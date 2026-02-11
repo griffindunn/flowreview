@@ -1,13 +1,63 @@
-#cy {
-    width: 100%;
-    height: 100%;
-    background-color: #f8f9fa; /* Light grey background for canvas */
+:root {
+    /* CSS Version Indicator - JS reads this */
+    --css-version: "v1.6";
 }
 
-.flow-item {
-    cursor: pointer;
+body, html { 
+    height: 100%; 
+    overflow: hidden; 
 }
 
-.flow-item:hover {
-    background-color: #e9ecef;
+#cy { 
+    width: 100%; 
+    height: 100%; 
+    background-color: #fff; 
+}
+
+/* Floating Upload Box */
+.controls-layer {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 999;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    width: 300px;
+}
+
+/* Version Tag Dashboard */
+.version-tag {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #333;
+    z-index: 1000;
+    pointer-events: none;
+    line-height: 1.4;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Loading Overlay */
+#loadingOverlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255,255,255,0.8);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+@media print {
+    .controls-layer, .version-tag, #loadingOverlay { display: none !important; }
+    #cy { height: 100vh; width: 100vw; }
 }
