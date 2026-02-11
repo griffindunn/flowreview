@@ -1,5 +1,5 @@
 // JS Version Indicator
-const JS_VERSION = "v1.6";
+const JS_VERSION = "v1.7";
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -8,13 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 1. REGISTER DAGRE EXTENSION ---
     try {
-        if (window.cytoscapeDagre) {
-            cytoscape.use(window.cytoscapeDagre);
+        if (typeof cytoscapeDagre !== 'undefined') {
+            cytoscape.use(cytoscapeDagre);
         } else {
-            console.warn("cytoscape-dagre library not loaded");
+            console.warn("cytoscape-dagre library not found! The layout might fail.");
         }
     } catch (e) {
-        console.warn(e);
+        console.error("Failed to register dagre extension:", e);
     }
     // -------------------------------------
 
