@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WxCC Visualizer v16 (Multi-Port)</title>
+    <title>WxCC Visualizer v17 (Fixed Ports)</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,7 +12,6 @@
     <style>
         body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; background: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         
-        /* Floating Controls */
         .controls-panel {
             position: absolute; top: 20px; left: 20px; width: 300px; z-index: 1000;
             background: rgba(255,255,255,0.98); border: 1px solid #dcdcdc;
@@ -21,24 +20,25 @@
 
         /* --- WEBEX CARD DESIGN --- */
         .wx-node {
-            width: 280px;
+            width: 260px;
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-            border: 1px solid #e0e0e0;
-            overflow: hidden;
+            border: 1px solid #b0b0b0;
             display: flex;
             flex-direction: column;
             font-size: 12px;
+            /* CRITICAL FIX: Visible overflow allows handles to stick out */
+            overflow: visible; 
+            position: relative;
         }
         
-        /* Selection State */
         .react-flow__node.selected .wx-node {
             border-color: #0076d1;
             box-shadow: 0 0 0 3px rgba(0, 118, 209, 0.2);
         }
 
-        /* 1. HEADER (Top Bar) */
+        /* HEADER */
         .wx-header {
             padding: 8px 12px;
             color: white;
@@ -46,60 +46,54 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-top-left-radius: 7px;
+            border-top-right-radius: 7px;
         }
 
-        /* 2. BODY CONTENT */
-        .wx-body { padding: 8px 12px; flex-grow: 1; }
+        /* BODY */
+        .wx-body { padding: 10px 12px; flex-grow: 1; min-height: 40px; }
 
-        /* Variable Box (The "Question") */
-        .wx-condition-box {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 4px;
-            padding: 6px 8px;
-            margin-bottom: 8px;
-            color: #495057;
-            font-family: Consolas, monospace;
-            font-size: 11px;
-            text-align: center;
-            font-weight: 600;
+        .wx-condition {
+            background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;
+            padding: 4px 8px; margin-bottom: 8px; font-family: Consolas, monospace;
+            font-size: 11px; color: #495057; text-align: center;
         }
 
-        /* 3. OUTCOME LIST (The "Answers") */
+        /* OUTCOME ROWS */
         .wx-outcome-list {
-            display: flex; flex-direction: column; gap: 0;
-            border-top: 1px solid #f0f0f0;
-            margin: 0 -12px; /* Stretch to edges */
+            display: flex; flex-direction: column;
+            border-top: 1px solid #eee;
         }
-
+        
         .wx-outcome-row {
             position: relative;
-            padding: 6px 12px;
+            padding: 8px 12px;
             border-bottom: 1px solid #f8f9fa;
-            display: flex; justify-content: space-between; align-items: center;
-            height: 28px;
-            transition: background 0.1s;
+            display: flex; justify-content: flex-end; align-items: center;
+            height: 32px;
+            font-weight: 500;
+            color: #555;
         }
-        .wx-outcome-row:last-child { border-bottom: none; }
-        .wx-outcome-row:hover { background: #f1f3f5; }
-        
-        .wx-outcome-label { color: #333; font-weight: 500; font-size: 11px; }
+        .wx-outcome-row:last-child { border-bottom: none; border-bottom-left-radius: 7px; border-bottom-right-radius: 7px; }
+        .wx-outcome-row:hover { background: #f8f9fa; color: #000; }
 
-        /* --- HANDLES (Connection Points) --- */
-        /* Input Handle (Left Center) */
+        /* --- HANDLES (The Dots) --- */
+        
+        /* Input (Left) */
         .target-handle { 
-            width: 10px; height: 10px; background: #adb5bd; border: 2px solid white; 
-            left: -5px; top: 20px !important; /* Force to header area */
+            width: 12px; height: 12px; background: #adb5bd; border: 2px solid white; 
+            left: -6px; top: 24px !important; z-index: 10;
         }
         
-        /* Output Handles (Right Side) */
+        /* Output (Right) */
         .source-handle {
-            width: 8px; height: 8px; background: #6c757d; border: 2px solid white;
-            right: -5px; 
+            width: 10px; height: 10px; background: #6c757d; border: 2px solid white;
+            right: -6px; z-index: 10;
         }
         
-        /* Dynamic positioning for multi-port handles is handled in JS */
+        /* Special Colors for Handles */
+        .handle-decision { background: #fd7e14 !important; }
+        .handle-standard { background: #007bff !important; }
 
         #crash-screen { padding: 40px; color: #721c24; background: #f8d7da; display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 9999; }
     </style>
@@ -131,25 +125,26 @@
             document.getElementById('crash-msg').innerText = `${msg}\nLine: ${line}`;
         };
 
-        // --- 1. CONFIGURATION ---
         const CONFIG = {
             'start': { color: '#28a745', icon: 'fa-play', label: 'Start Flow' },
             'event': { color: '#28a745', icon: 'fa-bolt', label: 'Event Trigger' },
             'disconnect-contact': { color: '#dc3545', icon: 'fa-stop', label: 'End Flow' },
             'ivr-menu': { color: '#fd7e14', icon: 'fa-list-ul', label: 'Menu' },
-            'case-statement': { color: '#fd7e14', icon: 'fa-code-branch', label: 'Case Switch' },
+            'case-statement': { color: '#fd7e14', icon: 'fa-code-branch', label: 'Switch' },
             'condition-activity': { color: '#fd7e14', icon: 'fa-question', label: 'Condition' },
-            'play-message': { color: '#007bff', icon: 'fa-volume-up', label: 'Play Audio' },
+            'play-message': { color: '#007bff', icon: 'fa-volume-up', label: 'Audio' },
             'queue-contact': { color: '#007bff', icon: 'fa-users', label: 'Queue' },
             'set-variable': { color: '#6f42c1', icon: 'fa-pen', label: 'Set Variable' },
             'default': { color: '#6c757d', icon: 'fa-cog', label: 'Activity' }
         };
 
-        // --- 2. MULTI-PORT NODE COMPONENT ---
         const WxNode = ({ data }) => {
+            // Determine if this is a "Multi-Output" node (Decision)
+            const isDecision = data.outcomes && data.outcomes.length > 0;
+
             return (
                 <div className="wx-node">
-                    {/* MASTER INPUT (Left) */}
+                    {/* INPUT (Left) */}
                     <Handle type="target" position={Position.Left} className="target-handle" />
 
                     {/* HEADER */}
@@ -160,43 +155,44 @@
 
                     {/* BODY */}
                     <div className="wx-body">
-                        {/* A. If it's a decision, show the variable being checked */}
                         {data.expression && (
-                            <div className="wx-condition-box" title="Variable being checked">
+                            <div className="wx-condition" title="Variable Checked">
                                 {data.expression}
                             </div>
                         )}
                         
-                        {/* B. Standard Data Rows (Audio, Set Var, etc.) */}
                         {data.rows && data.rows.map((r, i) => (
-                            <div key={i} style={{display:'flex', justifyContent:'space-between', marginBottom:'4px', color:'#666'}}>
-                                <span>{r.k}:</span>
-                                <span style={{fontWeight:600, color:'#333'}}>{r.v}</span>
+                            <div key={i} style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                                <span style={{color:'#888'}}>{r.k}:</span>
+                                <span style={{fontWeight:600}}>{r.v}</span>
                             </div>
                         ))}
                     </div>
 
-                    {/* C. DYNAMIC OUTPUTS (The Multi-Port System) */}
+                    {/* OUTPUTS */}
                     <div className="wx-outcome-list">
-                        {data.outcomes && data.outcomes.length > 0 ? (
+                        {isDecision ? (
                             data.outcomes.map((outcome, i) => (
                                 <div key={i} className="wx-outcome-row">
-                                    <span className="wx-outcome-label">{outcome}</span>
-                                    {/* UNIQUE ID HANDLE FOR EACH ROW */}
+                                    <span style={{marginRight:'8px'}}>{outcome}</span>
                                     <Handle 
                                         type="source" 
                                         position={Position.Right} 
                                         id={outcome} 
-                                        className="source-handle"
-                                        style={{ top: '50%', transform: 'translateY(-50%)' }}
+                                        className="source-handle handle-decision"
                                     />
                                 </div>
                             ))
                         ) : (
-                            // Default Single Output for non-branching nodes
-                            <div className="wx-outcome-row" style={{justifyContent:'flex-end'}}>
-                                <span className="wx-outcome-label" style={{color:'#999'}}>Next</span>
-                                <Handle type="source" position={Position.Right} id="default" className="source-handle" />
+                            // Standard Single Output
+                            <div className="wx-outcome-row" style={{justifyContent:'center', height:'10px', padding:0}}>
+                                <Handle 
+                                    type="source" 
+                                    position={Position.Right} 
+                                    id="default" 
+                                    className="source-handle handle-standard" 
+                                    style={{top:'-15px'}} // Move up slightly
+                                />
                             </div>
                         )}
                     </div>
@@ -205,7 +201,7 @@
         };
         const nodeTypes = { wxNode: WxNode };
 
-        // --- 3. PARSER ---
+        // --- PARSER ---
         const parseFlow = (json) => {
             const nodes = [];
             const edges = [];
@@ -221,23 +217,22 @@
                 const style = CONFIG[type] || CONFIG['default'];
                 const props = act.properties || {};
                 
-                // DATA EXTRACTION
                 const rows = [];
                 let outcomes = [];
                 let expression = null;
 
-                // 1. Decision Nodes (Multi-Port)
+                // 1. DECISION LOGIC
                 if (type === 'case-statement') {
                     if(props.expression) expression = props.expression;
                     if(props.cases) outcomes = Object.keys(props.cases);
-                    // Always ensure 'Default' exists for cases
+                    // Ensure 'Default' is always an option if not present
                     if(!outcomes.includes('Default')) outcomes.push('Default');
                 }
                 else if (type === 'ivr-menu') {
                     if(props.menuLinks) outcomes = Object.keys(props.menuLinks);
                     if(props.prompts?.[0]?.value) rows.push({k:'Prompt', v: props.prompts[0].value});
                 }
-                // 2. Standard Nodes
+                // 2. STANDARD LOGIC
                 else {
                     if(props.prompts?.[0]?.value) rows.push({k:'Audio', v: props.prompts[0].value});
                     if(props.updates) {
@@ -256,25 +251,26 @@
                         color: style.color,
                         expression,
                         rows,
-                        outcomes, // Passed to create handles
+                        outcomes, 
                         raw: act
                     }
                 });
             });
 
-            // EDGES
             links.forEach(link => {
                 if (link.sourceActivityId && link.targetActivityId) {
-                    let label = link.conditionExpr || "";
-                    if(label === 'true') label = 'Default'; // Map "true" to Default port
-                    if(label === 'false') label = 'Default';
+                    let label = link.conditionExpr || "default";
+                    if(label === 'true') label = 'default'; // Catch-all for simple links
                     
-                    // Logic to find the correct Source Handle ID
-                    // Usually the label (e.g., "1") matches the outcome key
-                    let sourceHandleId = label;
+                    // Match Edge to specific Handle ID
+                    // For Cases, the handle ID is the case name (e.g. "1", "English")
+                    // For Standard, the handle ID is "default"
                     
-                    // If label is empty, it's likely a standard flow, connect to 'default'
-                    if(!sourceHandleId) sourceHandleId = 'default';
+                    // Clean up label
+                    if (label === 'default' || label === '') {
+                        // If it's a decision node source, we might have a problem matching "default" if the case is named "Default" (Capital D)
+                        // But let's assume standard behavior first
+                    }
 
                     const isErr = label.toLowerCase().includes('error');
 
@@ -282,8 +278,7 @@
                         id: `${link.sourceActivityId}-${link.targetActivityId}`,
                         source: link.sourceActivityId,
                         target: link.targetActivityId,
-                        sourceHandle: sourceHandleId, // CRITICAL: Connect to specific row
-                        label: label === 'default' ? '' : label,
+                        sourceHandle: label === 'default' ? 'default' : label, // Try to match handle ID
                         type: 'smoothstep',
                         style: { stroke: isErr ? '#dc3545' : '#b1b1b7', strokeWidth: 2 },
                         animated: false
@@ -294,7 +289,6 @@
             return { nodes, edges };
         };
 
-        // --- 4. APP ---
         const App = () => {
             const [nodes, setNodes] = useState([]);
             const [edges, setEdges] = useState([]);
@@ -321,7 +315,7 @@
             return (
                 <>
                     <div className="controls-panel">
-                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>Visualizer v16</h6>
+                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>Visualizer v17</h6>
                         <input type="file" className="form-control form-control-sm mb-2" accept=".json" onChange={handleFileUpload} />
                         {fileName && <div className="small text-muted">Active: <strong>{fileName}</strong></div>}
                     </div>
