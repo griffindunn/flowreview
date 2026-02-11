@@ -1,15 +1,20 @@
+// JS Version Indicator
+const JS_VERSION = "v1.6";
+
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // --- FIX: REGISTER DAGRE EXTENSION ---
-    // This connects the dagre layout library to the core cytoscape library
+
+    // --- 0. DISPLAY VERSION DEBUGGER ---
+    displayVersions();
+
+    // --- 1. REGISTER DAGRE EXTENSION ---
     try {
-        if (typeof cytoscapeDagre !== 'undefined') {
-            cytoscape.use(cytoscapeDagre);
+        if (window.cytoscapeDagre) {
+            cytoscape.use(window.cytoscapeDagre);
         } else {
-            console.warn("cytoscape-dagre library not found! The layout might fail.");
+            console.warn("cytoscape-dagre library not loaded");
         }
     } catch (e) {
-        console.error("Failed to register dagre extension:", e);
+        console.warn(e);
     }
     // -------------------------------------
 
@@ -57,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         ],
-        layout: { name: 'preset' } // Start with no layout to save resources
+        layout: { name: 'preset' }
     });
 
     const fileInput = document.getElementById('fileInput');
@@ -69,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedFile = null;
 
-    // 1. Handle File Selection
     fileInput.addEventListener('change', (event) => {
         if (event.target.files.length > 0) {
             selectedFile = event.target.files[0];
@@ -80,14 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 2. Handle "Visualize" Click
     btnProcess.addEventListener('click', () => {
         if (!selectedFile) return;
 
-        // Show loading spinner
         loadingOverlay.classList.remove('d-none');
 
-        // Use setTimeout to allow UI to render spinner before heavy processing
         setTimeout(() => {
             const reader = new FileReader();
             
@@ -103,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     cy.elements().remove();
                     cy.add(elements);
 
-                    // Run the Dagre Layout
+                    // Run Layout
                     cy.layout({ 
                         name: 'dagre', 
                         rankDir: 'LR', 
@@ -129,10 +130,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     });
 
-    // PDF Handler
     document.getElementById('btnPdf').addEventListener('click', () => {
         window.print();
     });
+
+    // --- HELPER: Display Versions ---
+    function displayVersions() {
+        const htmlVer = document.querySelector('meta[name="app-version-html"]')?.content || "Unknown";
+        
+        // Read CSS variable
+        const cssVerRaw = getComputedStyle(document.documentElement).getPropertyValue('--css-version');
+        const cssVer = cssVerRaw ? cssVerRaw.replace(/['"]/g, '').trim() : "Unknown";
+
+        const div = document.createElement('div');
+        div.className = 'version-tag';
+        div.innerHTML = `
+            <strong>Debug Status</strong><br>
+            HTML: <span style="${htmlVer === JS_VERSION ? 'color:green' : 'color:red'}">${htmlVer}</span><br>
+            JS: <span style="color:green">${JS_VERSION}</span><br>
+            CSS: <span style="${cssVer === JS_VERSION ? 'color:green' : 'color:red'}">${cssVer}</span>
+        `;
+        document.body.appendChild(div);
+    }
 
     // --- PARSER ---
     function parseFlowBuilderJson(json) {
