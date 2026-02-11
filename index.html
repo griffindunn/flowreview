@@ -3,75 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WxCC Visualizer v14.0</title>
+    <title>WxCC Visualizer v15 (Top Header)</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.10.1/dist/style.css" />
 
     <style>
-        body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; background: #f8f9fa; font-family: -apple-system, system-ui, sans-serif; }
+        body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; background: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         
         .controls-panel {
-            position: absolute; top: 20px; left: 20px; width: 280px; z-index: 1000;
+            position: absolute; top: 20px; left: 20px; width: 300px; z-index: 1000;
             background: rgba(255,255,255,0.98); border: 1px solid #dee2e6;
             border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 15px;
         }
 
-        /* --- NODE CARD DESIGN --- */
+        /* --- NEW TOP-HEADER CARD DESIGN --- */
         .wx-node {
-            width: 240px;
+            width: 260px;
             background: white;
-            border-radius: 6px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex;
-            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             border: 1px solid #dcdcdc;
+            overflow: hidden;
             transition: all 0.2s;
+            font-size: 12px;
         }
         
-        .react-flow__node.selected .wx-node {
-            border-color: #0076d1;
-            box-shadow: 0 0 0 2px rgba(0,118,209,0.3);
+        /* Hover & Selection */
+        .wx-node:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.12); transform: translateY(-1px); }
+        .react-flow__node.selected .wx-node { border-color: #0d6efd; box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2); }
+
+        /* 1. Header Bar (Color + Icon + Title) */
+        .wx-header {
+            padding: 8px 12px;
+            color: white;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .wx-header i { font-size: 14px; opacity: 0.9; }
+        .wx-header span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 2. Sub-Header (Node Type) */
+        .wx-subheader {
+            background: #f8f9fa;
+            color: #6c757d;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 4px 12px;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
         }
 
-        /* Left Strip */
-        .wx-icon-col {
-            width: 36px; display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 14px; flex-shrink: 0;
-        }
+        /* 3. Body Content */
+        .wx-body { padding: 10px 12px; }
 
-        /* Content Body */
-        .wx-content-col {
-            flex-grow: 1; padding: 8px 10px; display: flex; flex-direction: column;
-            justify-content: center; min-width: 0;
-        }
-
-        .wx-title { 
-            font-weight: 700; font-size: 11px; color: #212529; margin-bottom: 2px; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-        }
-        .wx-subtitle { 
-            font-size: 10px; color: #6c757d; font-style: italic; margin-bottom: 6px; 
-        }
-
-        /* Data Rows */
+        /* Rows */
         .wx-row {
-            display: flex; justify-content: space-between; font-size: 10px;
-            border-top: 1px solid #f0f0f0; padding-top: 3px; margin-top: 2px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 6px; font-size: 11px;
         }
-        .wx-k { color: #888; margin-right: 5px; flex-shrink: 0; }
-        .wx-v { 
-            font-family: monospace; color: #333; font-weight: 600; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; 
+        .wx-row:last-child { margin-bottom: 0; }
+        
+        .wx-k { color: #666; font-weight: 500; }
+        .wx-v { font-family: Consolas, monospace; color: #222; font-weight: 600; background: #f1f3f5; padding: 2px 6px; border-radius: 4px; }
+
+        /* Special Styling for Case Nodes */
+        .wx-section-title {
+            font-size: 10px; color: #999; font-weight: 700; text-transform: uppercase;
+            margin-bottom: 4px; display: block;
+        }
+        .wx-case-list {
+            display: flex; flex-direction: column; gap: 4px; margin-top: 8px;
+        }
+        .wx-case-item {
+            background: #fff3cd; color: #856404; padding: 4px 8px;
+            border-radius: 4px; border: 1px solid #ffeeba;
+            font-size: 11px; font-weight: 600;
         }
 
-        /* Highlight specific row types */
-        .wx-row.case-row .wx-k { color: #e67e22; } /* Orange for cases */
-        .wx-row.var-row .wx-v { color: #007bff; }   /* Blue for variables */
-
-        .react-flow__handle { width: 6px; height: 6px; background: #adb5bd; }
-        #crash-screen { padding: 40px; color: #721c24; background: #f8d7da; display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 9999; }
+        /* Handles */
+        .react-flow__handle { width: 8px; height: 8px; background: #adb5bd; border: 2px solid white; }
     </style>
 
     <script type="importmap">
@@ -89,60 +105,81 @@
 </head>
 <body>
     <div id="root"></div>
-    <div id="crash-screen"><h3 class="fw-bold">Visualizer Error</h3><pre id="crash-msg" class="bg-white p-3 rounded border border-danger"></pre></div>
 
     <script type="text/babel" data-type="module">
         import React, { useState, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import ReactFlow, { Controls, Background, applyEdgeChanges, applyNodeChanges, Handle, Position, MiniMap } from 'reactflow';
 
-        window.onerror = function(message, source, lineno, colno, error) {
-            document.getElementById('crash-screen').style.display = 'block';
-            document.getElementById('crash-msg').innerText = `${message}\n\nLine: ${lineno}`;
+        // --- 1. CONFIG ---
+        const CONFIG = {
+            'start': { color: '#28a745', icon: 'fa-play', typeName: 'Entry Point' }, // Green
+            'event': { color: '#28a745', icon: 'fa-bolt', typeName: 'Trigger' },
+            'disconnect-contact': { color: '#dc3545', icon: 'fa-stop', typeName: 'End' }, // Red
+            
+            'play-message': { color: '#007bff', icon: 'fa-volume-up', typeName: 'Audio' }, // Blue
+            'queue-contact': { color: '#007bff', icon: 'fa-users', typeName: 'Queue' },
+            'blind-transfer': { color: '#007bff', icon: 'fa-share', typeName: 'Transfer' },
+
+            'ivr-menu': { color: '#fd7e14', icon: 'fa-list-ul', typeName: 'Menu' }, // Orange
+            'case-statement': { color: '#fd7e14', icon: 'fa-code-branch', typeName: 'Switch' },
+            'condition-activity': { color: '#fd7e14', icon: 'fa-question', typeName: 'Condition' },
+
+            'set-variable': { color: '#6f42c1', icon: 'fa-pen', typeName: 'Set Data' }, // Purple
+            'parse-activity': { color: '#6f42c1', icon: 'fa-code', typeName: 'Parse' },
+            
+            'default': { color: '#6c757d', icon: 'fa-cog', typeName: 'Activity' }
         };
 
-        // --- 1. NODE CONFIGURATION ---
-        const NODE_CONFIG = {
-            'start':            { color: '#2fb755', icon: 'fa-play', label: 'Start Flow' },
-            'event':            { color: '#2fb755', icon: 'fa-bolt', label: 'Event Trigger' },
-            'disconnect-contact': { color: '#dc3545', icon: 'fa-phone-slash', label: 'Disconnect' },
-            'play-message':     { color: '#00a0d1', icon: 'fa-volume-high', label: 'Play Audio' },
-            'queue-contact':    { color: '#00a0d1', icon: 'fa-users', label: 'Queue Contact' },
-            'feedback':         { color: '#00a0d1', icon: 'fa-comment-dots', label: 'Feedback Survey' },
-            
-            // The ones we are fixing now:
-            'ivr-menu':         { color: '#ff9d00', icon: 'fa-list-ol', label: 'Menu' },
-            'case-statement':   { color: '#ff9d00', icon: 'fa-code-branch', label: 'Case / Switch' },
-            'condition-activity':{ color: '#ff9d00', icon: 'fa-question', label: 'If / Else' },
-            
-            'set-variable':     { color: '#9f67cc', icon: 'fa-pen', label: 'Set Variable' },
-            'parse-activity':   { color: '#9f67cc', icon: 'fa-code', label: 'Parse Data' },
-            'run-script':       { color: '#9f67cc', icon: 'fa-scroll', label: 'Execute Script' },
-            'default':          { color: '#6c757d', icon: 'fa-gear', label: 'Activity' }
-        };
-
-        // --- 2. COMPONENT ---
+        // --- 2. THE NEW CARD COMPONENT ---
         const WxNode = ({ data }) => {
             return (
                 <div className="wx-node">
                     <Handle type="target" position={Position.Left} />
-                    <div className="wx-icon-col" style={{ backgroundColor: data.color }}>
+                    
+                    {/* Header */}
+                    <div className="wx-header" style={{ backgroundColor: data.color }}>
                         <i className={`fa-solid ${data.icon}`}></i>
+                        <span>{data.label}</span>
                     </div>
-                    <div className="wx-content-col">
-                        <div className="wx-title" title={data.label}>{data.label}</div>
-                        <div className="wx-subtitle">{data.subLabel}</div>
+
+                    {/* Sub-Header (Type) */}
+                    <div className="wx-subheader">{data.typeName}</div>
+
+                    {/* Body */}
+                    <div className="wx-body">
+                        {/* 1. Variable / Expression Check */}
+                        {data.expression && (
+                            <div className="mb-2">
+                                <span className="wx-section-title">Checking Variable</span>
+                                <div className="wx-v w-100">{data.expression}</div>
+                            </div>
+                        )}
+
+                        {/* 2. Standard Rows (Msg, Event, etc.) */}
                         {data.rows && data.rows.map((r, i) => (
-                            <div key={i} className={`wx-row ${r.type || ''}`}>
-                                <span className="wx-k">{r.k}:</span>
-                                <span className="wx-v" title={r.v}>{r.v}</span>
+                            <div key={i} className="wx-row">
+                                <span className="wx-k">{r.k}</span>
+                                <span className="wx-v">{r.v}</span>
                             </div>
                         ))}
+
+                        {/* 3. Case List (Specific to Decision Nodes) */}
+                        {data.cases && data.cases.length > 0 && (
+                            <div className="wx-case-list">
+                                <span className="wx-section-title">Outcomes</span>
+                                {data.cases.map((c, i) => (
+                                    <div key={i} className="wx-case-item">{c}</div>
+                                ))}
+                            </div>
+                        )}
                     </div>
+
                     <Handle type="source" position={Position.Right} />
                 </div>
             );
         };
+
         const nodeTypes = { wxNode: WxNode };
 
         // --- 3. PARSER ---
@@ -158,39 +195,31 @@
 
             Object.values(activities).forEach(act => {
                 const type = act.activityName || 'default';
-                const config = NODE_CONFIG[type] || NODE_CONFIG['default'];
-                const rows = [];
+                const style = CONFIG[type] || CONFIG['default'];
                 const props = act.properties || {};
-
-                // --- CUSTOM DATA EXTRACTION LOGIC ---
                 
-                // 1. CASES & MENUS (The Update)
+                // Extraction
+                const rows = [];
+                let cases = [];
+                let expression = null;
+
+                // A. CASES
                 if (type === 'case-statement') {
-                    // Show variable being checked
-                    if (props.expression) rows.push({ k: 'Check', v: props.expression, type: 'var-row' });
-                    // List branches
-                    if (props.cases) {
-                        Object.keys(props.cases).forEach(key => rows.push({ k: 'Case', v: key, type: 'case-row' }));
-                    }
-                }
+                    if (props.expression) expression = props.expression;
+                    if (props.cases) cases = Object.keys(props.cases);
+                } 
                 else if (type === 'ivr-menu') {
+                    if (props.menuLinks) cases = Object.keys(props.menuLinks);
+                    if (props.prompts?.[0]?.value) rows.push({ k: 'Prompt', v: props.prompts[0].value });
+                }
+                // B. STANDARD
+                else {
                     if (props.prompts?.[0]?.value) rows.push({ k: 'Audio', v: props.prompts[0].value });
-                    // List menu options
-                    if (props.menuLinks) {
-                        Object.keys(props.menuLinks).forEach(key => rows.push({ k: 'Opt', v: key, type: 'case-row' }));
+                    if (props.updates) {
+                        const k = Object.keys(props.updates)[0];
+                        if(k) rows.push({ k: 'Set', v: k });
                     }
-                }
-                // 2. PLAY / AUDIO
-                else if (props.prompts && props.prompts[0]) {
-                    rows.push({ k: 'Audio', v: props.prompts[0].value });
-                }
-                // 3. SET VARIABLE
-                else if (props.updates) {
-                    Object.keys(props.updates).forEach(key => rows.push({ k: 'Set', v: key, type: 'var-row' }));
-                }
-                // 4. EVENTS
-                else if (props.event) {
-                    rows.push({ k: 'Event', v: props.event });
+                    if (props.event) rows.push({ k: 'Trigger', v: props.event });
                 }
 
                 // Coordinates
@@ -203,22 +232,24 @@
                     position: { x, y },
                     data: { 
                         label: act.name,
-                        subLabel: config.label,
-                        icon: config.icon,
-                        color: config.color,
-                        rows: rows,
-                        raw: act 
+                        typeName: style.typeName,
+                        icon: style.icon,
+                        color: style.color,
+                        rows,
+                        cases,
+                        expression,
+                        raw: act
                     }
                 });
             });
 
+            // Edges
             links.forEach(link => {
                 if (link.sourceActivityId && link.targetActivityId) {
                     let label = link.conditionExpr || "";
                     if(label === 'true') label = '';
-                    
                     const isErr = label.toLowerCase().includes('error') || label.toLowerCase().includes('timeout') || link.type === 'error';
-
+                    
                     edges.push({
                         id: `${link.sourceActivityId}-${link.targetActivityId}`,
                         source: link.sourceActivityId,
@@ -226,7 +257,7 @@
                         label: label,
                         type: 'smoothstep',
                         style: { stroke: isErr ? '#dc3545' : '#b1b1b7', strokeWidth: 2 },
-                        labelStyle: { fill: '#666', fontSize: 11 },
+                        labelStyle: { fill: '#666', fontSize: 11, fontWeight: 700 },
                         animated: false
                     });
                 }
@@ -240,27 +271,21 @@
             const [nodes, setNodes] = useState([]);
             const [edges, setEdges] = useState([]);
             const [fileName, setFileName] = useState('');
-            const [selectedNode, setSelectedNode] = useState(null);
 
             const onNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
             const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
-            const onNodeClick = useCallback((event, node) => setSelectedNode(node), []);
 
-            const handleFileUpload = (event) => {
-                const file = event.target.files[0];
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
                 if (!file) return;
                 setFileName(file.name);
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = (event) => {
                     try {
-                        const json = JSON.parse(e.target.result);
-                        const { nodes: newNodes, edges: newEdges } = parseFlow(json);
-                        if (newNodes.length === 0) { alert("No nodes found."); return; }
-                        setNodes(newNodes);
-                        setEdges(newEdges);
-                    } catch (err) {
-                        alert("Error parsing JSON: " + err.message);
-                    }
+                        const json = JSON.parse(event.target.result);
+                        const { nodes: n, edges: e } = parseFlow(json);
+                        setNodes(n); setEdges(e);
+                    } catch (err) { alert(err.message); }
                 };
                 reader.readAsText(file);
             };
@@ -268,24 +293,15 @@
             return (
                 <>
                     <div className="controls-panel">
-                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>Visualizer v14.0</h6>
-                        <input type="file" className="form-control form-control-sm mb-3" accept=".json" onChange={handleFileUpload} />
-                        {fileName && <div className="alert alert-light border py-2 px-3 small"><strong>Active:</strong> {fileName}</div>}
-                        {selectedNode && (
-                            <div className="mt-3 border-top pt-3">
-                                <h6 className="small fw-bold">Selection Details</h6>
-                                <div className="bg-light border rounded p-2" style={{maxHeight: '300px', overflow: 'auto', fontSize: '10px'}}>
-                                    <pre className="m-0">{JSON.stringify(selectedNode.data.raw, null, 2)}</pre>
-                                </div>
-                            </div>
-                        )}
+                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>Visualizer v15</h6>
+                        <input type="file" className="form-control form-control-sm mb-2" accept=".json" onChange={handleFileUpload} />
+                        {fileName && <div className="small text-muted">Active: <strong>{fileName}</strong></div>}
                     </div>
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
-                        onNodeClick={onNodeClick}
                         nodeTypes={nodeTypes}
                         fitView
                     >
