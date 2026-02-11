@@ -1,74 +1,75 @@
-const JS_VERSION = "v2.0";
+const JS_VERSION = "v3.0";
 
 document.addEventListener('DOMContentLoaded', () => {
-    displayVersions();
+    // Bootstrap Modal Instance
+    const detailsPanel = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
+    const detailsContent = document.getElementById('detailsContent');
 
-    // Register extensions
-    try {
-        if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre);
-    } catch (e) { console.warn(e); }
-
+    // Init Cytoscape
     let cy = cytoscape({
         container: document.getElementById('cy'),
         boxSelectionEnabled: false,
         autounselectify: true,
         style: [
-            // --- NODE STYLE (Card Look) ---
+            // GHOST NODE (The HTML Label sits on top of this invisible node)
             {
                 selector: 'node',
                 style: {
-                    'shape': 'round-rectangle',
-                    'width': 220,
+                    'width': 200, 
                     'height': 80,
-                    'background-color': '#ffffff',
-                    'border-width': 1,
-                    'border-color': '#b0b0b0',
-                    'border-opacity': 1,
-                    'label': 'data(label)',
-                    'color': '#333333',
-                    'font-size': '10px',
-                    'font-family': 'Helvetica, Arial, sans-serif',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'text-wrap': 'wrap',
-                    'text-max-width': 200,
-                    'text-justification': 'left',
-                    'shadow-blur': 4,
-                    'shadow-color': '#000',
-                    'shadow-opacity': 0.1,
-                    'shadow-offset-y': 2
+                    'background-opacity': 0, // Invisible background
+                    'border-width': 0
                 }
             },
-            // Color headers based on Type
-            { selector: 'node[type="start"]', style: { 'border-left-width': 6, 'border-left-color': '#28a745' } }, // Green
-            { selector: 'node[type="disconnect-contact"]', style: { 'border-left-width': 6, 'border-left-color': '#dc3545' } }, // Red
-            { selector: 'node[type="play-message"]', style: { 'border-left-width': 6, 'border-left-color': '#007bff' } }, // Blue
-            { selector: 'node[type="ivr-menu"]', style: { 'border-left-width': 6, 'border-left-color': '#fd7e14' } }, // Orange
-            { selector: 'node[type="set-variable"]', style: { 'border-left-width': 6, 'border-left-color': '#6f42c1' } }, // Purple
-            { selector: 'node[type="action"]', style: { 'border-left-width': 6, 'border-left-color': '#17a2b8' } }, // Teal
-
-            // --- EDGE STYLE (Connectors) ---
+            // EDGES
             {
                 selector: 'edge',
                 style: {
                     'width': 2,
-                    'curve-style': 'bezier', // Smooth curves
-                    'line-color': '#a0a0a0',
-                    'target-arrow-color': '#a0a0a0',
+                    'curve-style': 'bezier',
+                    'line-color': '#b0b0b0',
+                    'target-arrow-color': '#b0b0b0',
                     'target-arrow-shape': 'triangle',
-                    'arrow-scale': 1.2,
-                    'label': 'data(label)',
-                    'font-size': '9px',
-                    'text-background-color': '#f4f4f4',
+                    'font-size': '10px',
+                    'color': '#555',
+                    'text-background-color': '#fff',
                     'text-background-opacity': 1,
-                    'text-background-padding': 3,
-                    'color': '#555'
+                    'text-background-padding': 2
+                }
+            },
+            // RED ERROR LINES
+            {
+                selector: 'edge[label="error"], edge[label="Error"], edge[label="timeout"], edge[isError="true"]',
+                style: {
+                    'line-color': '#dc3545',
+                    'target-arrow-color': '#dc3545',
+                    'width': 2
                 }
             }
         ],
         layout: { name: 'preset' }
     });
 
+    // Configure HTML Label Extension
+    cy.nodeHtmlLabel([{
+        query: 'node',
+        valign: "center",
+        halign: "center",
+        valignBox: "center",
+        halignBox: "center",
+        tpl: function(data) {
+            return generateNodeHTML(data);
+        }
+    }]);
+
+    // Handle Click for Details
+    cy.on('tap', 'node', function(evt){
+        const nodeData = evt.target.data();
+        detailsContent.textContent = JSON.stringify(nodeData.raw, null, 4);
+        detailsPanel.show();
+    });
+
+    // --- UI LOGIC ---
     const fileInput = document.getElementById('fileInput');
     const btnProcess = document.getElementById('btnProcess');
     const btnFit = document.getElementById('btnFit');
@@ -91,19 +92,15 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onload = (e) => {
                 try {
                     const json = JSON.parse(e.target.result);
-                    const elements = parseFlowBuilderJson(json);
+                    const elements = parseWxCCFlow(json);
                     
                     if (elements.length === 0) throw new Error("Parsed 0 nodes.");
 
                     cy.elements().remove();
                     cy.add(elements);
-
-                    // Use 'preset' layout to respect your x/y coordinates
-                    cy.layout({ 
-                        name: 'preset',
-                        fit: true,
-                        padding: 50
-                    }).run();
+                    
+                    // Respect coordinates
+                    cy.layout({ name: 'preset', fit: true, padding: 50 }).run();
 
                     document.getElementById('flowInfo').classList.remove('d-none');
                     document.getElementById('flowName').innerText = json.name || selectedFile.name;
@@ -117,24 +114,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
             reader.readAsText(selectedFile);
-        }, 50);
+        }, 100);
     });
 
-    // Fit Button
-    btnFit.addEventListener('click', () => {
-        cy.fit(50);
-    });
-
-    // Smart PDF Export (Fits graph before print)
+    btnFit.addEventListener('click', () => cy.fit(50));
+    
     document.getElementById('btnPdf').addEventListener('click', () => {
-        cy.fit(20); // Fit graph to screen
-        setTimeout(() => {
-            window.print();
-        }, 500);
+        cy.fit(50);
+        setTimeout(() => window.print(), 500);
     });
 
-    // --- PARSER V2 (With Coordinates & Details) ---
-    function parseFlowBuilderJson(json) {
+    // --- PARSER ---
+    function parseWxCCFlow(json) {
         let nodes = [];
         let edges = [];
 
@@ -144,50 +135,56 @@ document.addEventListener('DOMContentLoaded', () => {
         const links = json.process.links;
         const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
 
-        // 1. Parse Nodes
+        // Parse Nodes
         Object.values(activities).forEach(act => {
-            let nodeLabel = act.name || "Unknown";
-            let nodeType = act.activityName || "action";
-            let details = "";
+            const typeInfo = getNodeTypeInfo(act);
+            const posX = widgets[act.id]?.point?.x || 0;
+            const posY = widgets[act.id]?.point?.y || 0;
 
-            // Get Details based on type
-            if (nodeType === 'play-message') {
-                // Try to find the message value
-                if(act.properties && act.properties.prompts) {
-                    details = "\nPlay: " + (act.properties.prompts[0]?.value || "Audio File");
-                }
-            } else if (nodeType === 'set-variable') {
-                 if(act.properties && act.properties.updates) {
-                     details = "\nSet: " + Object.keys(act.properties.updates).join(", ");
-                 }
-            } else if (nodeType === 'ivr-menu') {
-                if(act.properties && act.properties.links) {
-                     details = "\nOptions: " + Object.keys(act.properties.links).join(", ");
-                }
+            // Extract rows for the card body
+            let rows = [];
+            if(act.activityName === 'play-message' && act.properties?.prompts) {
+                rows.push({ label: "Prompt", val: act.properties.prompts[0]?.value || "Variable" });
+            } 
+            else if(act.activityName === 'set-variable' && act.properties?.updates) {
+                Object.keys(act.properties.updates).forEach(k => {
+                    rows.push({ label: "Set", val: k });
+                });
+            }
+            else if(act.activityName === 'ivr-menu' && act.properties?.links) {
+                rows.push({ label: "Opts", val: Object.keys(act.properties.links).length + " Links" });
+            }
+            else if(act.activityName === 'case-statement' && act.properties?.cases) {
+                 rows.push({ label: "Cases", val: Object.keys(act.properties.cases).length });
             }
 
-            // Get Coordinate (x,y) from the 'diagram' block
-            let posX = 0, posY = 0;
-            if (widgets[act.id] && widgets[act.id].point) {
-                posX = widgets[act.id].point.x;
-                posY = widgets[act.id].point.y;
-            }
+            // Always add ID or subtype if rows empty
+            if(rows.length === 0) rows.push({ label: "Type", val: act.activityName });
 
             nodes.push({
                 data: { 
                     id: act.id, 
-                    label: `${nodeLabel}${details}`, // Name + Details
-                    type: nodeType 
+                    name: act.name || "Unknown",
+                    icon: typeInfo.icon,
+                    colorClass: typeInfo.bgClass,
+                    rows: rows,
+                    raw: act // Store full JSON for details panel
                 },
-                position: { x: posX, y: posY } // Manual Layout
+                position: { x: posX, y: posY }
             });
         });
 
-        // 2. Parse Edges
+        // Parse Edges
         links.forEach(link => {
-            let edgeLabel = link.conditionExpr || "";
-            if (!edgeLabel && link.properties && link.properties.value) {
-                edgeLabel = link.properties.value;
+            let label = link.conditionExpr || "";
+            // Simplify labels
+            if(label === 'true') label = '';
+            if(label === 'false') label = 'Else';
+            
+            // Detect error lines
+            let isError = false;
+            if(label.toLowerCase().includes('error') || label.toLowerCase().includes('timeout') || link.type === 'error') {
+                isError = true;
             }
 
             if (link.sourceActivityId && link.targetActivityId) {
@@ -195,7 +192,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     data: {
                         source: link.sourceActivityId,
                         target: link.targetActivityId,
-                        label: edgeLabel
+                        label: label,
+                        isError: isError.toString()
                     }
                 });
             }
@@ -204,10 +202,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return [...nodes, ...edges];
     }
 
-    function displayVersions() {
-        const div = document.createElement('div');
-        div.className = 'version-tag';
-        div.innerHTML = `JS: <span style="color:green">${JS_VERSION}</span>`;
-        document.body.appendChild(div);
+    // --- HELPERS ---
+    function getNodeTypeInfo(act) {
+        const type = act.activityName;
+        if(type === 'start' || type === 'event') return { icon: 'fa-play', bgClass: 'bg-start' };
+        if(type === 'disconnect-contact') return { icon: 'fa-phone-slash', bgClass: 'bg-end' };
+        if(type === 'ivr-menu') return { icon: 'fa-list-ol', bgClass: 'bg-menu' };
+        if(type === 'play-message') return { icon: 'fa-volume-high', bgClass: 'bg-play' };
+        if(type === 'set-variable') return { icon: 'fa-pencil', bgClass: 'bg-set' };
+        if(type === 'case-statement') return { icon: 'fa-code-branch', bgClass: 'bg-condition' };
+        if(type === 'queue-contact') return { icon: 'fa-users', bgClass: 'bg-action' };
+        return { icon: 'fa-gear', bgClass: 'bg-default' };
+    }
+
+    // Generate the HTML for the Node Card
+    function generateNodeHTML(data) {
+        let rowsHtml = data.rows.map(r => `
+            <div class="wx-row">
+                <span class="wx-label">${r.label}</span>
+                <span class="wx-val" title="${r.val}">${r.val}</span>
+            </div>
+        `).join('');
+
+        return `
+            <div class="wx-node">
+                <div class="wx-header ${data.colorClass}">
+                    <i class="fa-solid ${data.icon}"></i>
+                    <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${data.name}</span>
+                </div>
+                <div class="wx-body">
+                    ${rowsHtml}
+                </div>
+            </div>
+        `;
     }
 });
