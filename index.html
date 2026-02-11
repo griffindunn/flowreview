@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WxCC Visualizer v21.0</title>
+    <title>WxCC Visualizer v22.0</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,80 +15,56 @@
     <style>
         body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; background: #f0f2f5; font-family: "Segoe UI", Tahoma, sans-serif; }
         
+        /* --- THE SMOKE TEST BANNER --- */
+        #version-banner {
+            position: fixed; top: 0; left: 0; width: 100%; height: 40px;
+            background: #d63939; color: white; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 99999; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
         .controls-panel {
-            position: absolute; top: 20px; left: 20px; width: 340px; z-index: 1000;
+            position: absolute; top: 60px; left: 20px; width: 340px; z-index: 1000;
             background: white; border: 1px solid #ced4da; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 15px;
         }
 
         /* --- THE CASE NODE CLONE --- */
         .wx-node {
-            width: 280px;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border: 1px solid #dee2e6;
-            overflow: visible;
-            display: flex;
-            flex-direction: column;
+            width: 280px; background: white; border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #dee2e6;
+            overflow: visible; display: flex; flex-direction: column;
         }
-
         /* Top Header */
         .wx-header {
-            padding: 10px 12px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 1px solid #eee;
+            padding: 10px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eee;
         }
         .wx-icon-box {
             width: 32px; height: 32px; background: #00b0ad; border-radius: 4px;
-            display: flex; align-items: center; justify-content: center; color: white;
-            font-size: 16px;
+            display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;
         }
         .wx-header-text { display: flex; flex-direction: column; }
         .wx-node-name { font-weight: 700; font-size: 13px; color: #333; line-height: 1.2; }
         .wx-node-type { font-size: 10px; color: #888; text-transform: capitalize; }
-
         /* Variable Area */
         .wx-variable-area {
-            padding: 8px 12px;
-            background: #fdfdfd;
-            font-size: 11px;
-            color: #555;
-            font-style: italic;
-            border-bottom: 1px solid #f0f0f0;
-            font-family: Consolas, monospace;
+            padding: 8px 12px; background: #fdfdfd; font-size: 11px; color: #555;
+            font-style: italic; border-bottom: 1px solid #f0f0f0; font-family: Consolas, monospace;
         }
-
         /* Outcome Sections */
         .wx-section-label {
-            background: #f1f3f5;
-            padding: 4px 12px;
-            font-size: 10px;
-            color: #666;
-            font-weight: 700;
-            text-transform: uppercase;
+            background: #f1f3f5; padding: 4px 12px; font-size: 10px; color: #666;
+            font-weight: 700; text-transform: uppercase;
         }
-
         .wx-outcome-row {
-            position: relative;
-            padding: 8px 12px;
-            border-bottom: 1px solid #f8f9fa;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 34px;
-            background: #fff;
+            position: relative; padding: 8px 12px; border-bottom: 1px solid #f8f9fa;
+            display: flex; justify-content: space-between; align-items: center; height: 34px; background: #fff;
         }
         .wx-outcome-label { font-size: 12px; color: #444; font-weight: 500; }
         .wx-error-label { color: #d63939; font-weight: 600; }
-
         /* Handles */
         .react-flow__handle { width: 10px; height: 10px; background: #6c757d; border: 2px solid white; z-index: 100; }
         .target-handle { left: -6px; top: 26px !important; }
         .source-handle { right: -6px; }
-
-        #crash-screen { padding: 40px; color: #721c24; background: #f8d7da; display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 9999; }
     </style>
 
     <script type="importmap">
@@ -102,19 +81,19 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
+    <div id="version-banner">VERSION 22.0 ACTIVE - IF YOU SEE THIS, THE CODE UPDATED.</div>
+    
     <div id="root"></div>
-    <div id="crash-screen"><h3>Startup Error</h3><pre id="crash-msg"></pre></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useCallback } from 'react';
+        import React, { useState } from 'react';
         import { createRoot } from 'react-dom/client';
-        import ReactFlow, { Controls, Background, applyEdgeChanges, applyNodeChanges, Handle, Position, MiniMap } from 'reactflow';
+        import ReactFlow, { Controls, Background, applyEdgeChanges, applyNodeChanges, Handle, Position } from 'reactflow';
 
         const nodeTypes = {
             wxNode: ({ data }) => (
                 <div className="wx-node">
                     <Handle type="target" position={Position.Left} className="target-handle" />
-                    
                     <div className="wx-header">
                         <div className="wx-icon-box"><i className={`fa-solid ${data.icon}`}></i></div>
                         <div className="wx-header-text">
@@ -122,10 +101,7 @@
                             <div className="wx-node-type">{data.typeName}</div>
                         </div>
                     </div>
-
                     {data.expression && <div className="wx-variable-area">({data.expression})</div>}
-
-                    {/* Case Outcomes */}
                     {data.isCase && <div className="wx-section-label">Case</div>}
                     <div className="wx-outcome-container">
                         {data.outcomes && data.outcomes.map((out, i) => (
@@ -135,8 +111,6 @@
                             </div>
                         ))}
                     </div>
-
-                    {/* Standard Footers for Case Nodes */}
                     {data.isCase && (
                         <>
                             <div className="wx-section-label">Default</div>
@@ -151,8 +125,6 @@
                             </div>
                         </>
                     )}
-
-                    {/* Fallback output for simple nodes */}
                     {!data.isCase && (!data.outcomes || data.outcomes.length === 0) && (
                         <div className="wx-outcome-row" style={{justifyContent:'flex-end', height: '10px'}}>
                             <Handle type="source" position={Position.Right} id="default" className="source-handle" />
@@ -175,39 +147,33 @@
                 let outcomes = [];
                 let expression = null;
                 let isCase = false;
+                let typeName = type;
 
                 if (type.includes('case')) {
                     isCase = true;
                     icon = 'fa-code-branch';
+                    typeName = 'Case';
                     expression = act.properties?.expression;
                     outcomes = act.properties?.cases ? Object.keys(act.properties.cases) : [];
                 } else if (type.includes('menu')) {
                     icon = 'fa-list-ul';
+                    typeName = 'Menu';
                     outcomes = act.properties?.menuLinks ? Object.keys(act.properties.menuLinks) : [];
                 } else if (type.includes('play')) {
                     icon = 'fa-play-circle';
+                    typeName = 'Play Message';
                 }
 
                 nodes.push({
                     id: act.id,
                     type: 'wxNode',
                     position: { x: widgets[act.id]?.point?.x || 0, y: widgets[act.id]?.point?.y || 0 },
-                    data: { 
-                        label: act.name, 
-                        typeName: type === 'case-statement' ? 'Case' : type, 
-                        icon, 
-                        expression, 
-                        outcomes, 
-                        isCase,
-                        raw: act 
-                    }
+                    data: { label: act.name, typeName, icon, expression, outcomes, isCase, raw: act }
                 });
             });
 
             links.forEach(l => {
                 let sHandle = l.conditionExpr || 'default';
-                
-                // Map logical conditions to physical handles
                 if (sHandle === 'true') sHandle = 'Default';
                 if (l.type === 'error') sHandle = 'error';
 
@@ -216,7 +182,6 @@
                     source: l.sourceActivityId,
                     target: l.targetActivityId,
                     sourceHandle: sHandle,
-                    label: l.conditionExpr === 'true' ? '' : l.conditionExpr,
                     type: 'smoothstep',
                     style: { stroke: sHandle === 'error' ? '#d63939' : '#b1b1b7', strokeWidth: 2 }
                 });
@@ -240,7 +205,7 @@
             return (
                 <div style={{ width: '100vw', height: '100vh' }}>
                     <div className="controls-panel">
-                        <h6 className="fw-bold"><i className="fa-solid fa-code-branch me-2"></i>WxCC Visualizer v21.0</h6>
+                        <h6 className="fw-bold">WxCC Visualizer v22.0</h6>
                         <input type="file" onChange={handleFile} className="form-control form-control-sm mt-2" />
                     </div>
                     <ReactFlow nodes={nodes} edges={edges} 
