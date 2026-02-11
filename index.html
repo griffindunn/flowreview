@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WxCC Visualizer v18 (Row-Aligned)</title>
+    <title>WxCC Visualizer v19 (Fixed Branches)</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,20 +13,20 @@
         body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; background: #f4f4f4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         
         .controls-panel {
-            position: absolute; top: 20px; left: 20px; width: 300px; z-index: 1000;
+            position: absolute; top: 20px; left: 20px; width: 320px; z-index: 1000;
             background: rgba(255,255,255,0.98); border: 1px solid #dcdcdc;
             border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 15px;
         }
 
-        /* --- CARD CONTAINER --- */
+        /* --- CARD DESIGN --- */
         .wx-node {
-            width: 260px;
+            width: 280px;
             background: white;
             border-radius: 6px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            border: 1px solid #ccc;
+            border: 1px solid #b0b0b0;
             display: flex;
-            overflow: visible; /* Important: Allows handles to stick out */
+            overflow: visible; /* CRITICAL for handles */
             font-size: 12px;
             position: relative;
         }
@@ -36,72 +36,77 @@
             box-shadow: 0 0 0 3px rgba(0, 118, 209, 0.2);
         }
 
-        /* --- LEFT COLOR STRIP --- */
+        /* LEFT STRIP */
         .wx-strip {
-            width: 8px;
+            width: 6px;
             border-top-left-radius: 5px;
             border-bottom-left-radius: 5px;
             flex-shrink: 0;
         }
 
-        /* --- CONTENT AREA --- */
+        /* CONTENT */
         .wx-content {
             flex-grow: 1;
-            padding: 8px 10px;
             display: flex;
             flex-direction: column;
         }
 
-        /* Header */
+        /* HEADER */
         .wx-header {
             display: flex; align-items: center; gap: 8px;
-            margin-bottom: 6px; padding-bottom: 6px;
-            border-bottom: 1px solid #f0f0f0;
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            background: #fff;
+            border-top-right-radius: 6px;
         }
-        .wx-icon { color: #666; font-size: 14px; }
-        .wx-title { font-weight: 700; color: #333; font-size: 12px; }
-        .wx-type { font-size: 10px; color: #999; margin-left: auto; text-transform: uppercase; }
+        .wx-icon { font-size: 14px; }
+        .wx-title { font-weight: 700; color: #222; font-size: 12px; flex-grow: 1; }
+        .wx-type { font-size: 9px; color: #999; text-transform: uppercase; font-weight: 600; }
 
-        /* Variable / Info Box */
-        .wx-info-box {
+        /* BODY INFO */
+        .wx-info-body { padding: 6px 10px; }
+        
+        .wx-condition-box {
             background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;
-            padding: 4px 8px; margin-bottom: 8px; 
-            font-family: Consolas, monospace; font-size: 11px; color: #495057;
+            padding: 4px 8px; margin-bottom: 4px;
+            font-family: Consolas, monospace; font-size: 11px; color: #555;
         }
 
-        /* Rows (Outcomes) */
-        .wx-row-list {
-            display: flex; flex-direction: column; gap: 4px;
+        /* OUTCOME ROWS */
+        .wx-rows-container {
+            display: flex; flex-direction: column;
+            border-top: 1px solid #f0f0f0;
         }
 
         .wx-row-item {
-            position: relative; /* Anchor for the handle */
-            background: #fff;
-            border: 1px solid #eee;
-            border-radius: 4px;
-            padding: 4px 8px;
+            position: relative;
+            padding: 6px 10px;
+            border-bottom: 1px solid #f8f9fa;
             display: flex; justify-content: space-between; align-items: center;
-            height: 28px;
+            height: 30px;
+            font-size: 11px;
+            color: #444;
         }
-        .wx-row-item:hover { border-color: #bbb; background: #fafafa; }
+        .wx-row-item:last-child { border-bottom: none; border-bottom-right-radius: 6px; }
+        .wx-row-item:hover { background: #f9f9f9; color: #000; }
         
-        .wx-label { font-weight: 500; color: #444; font-size: 11px; }
+        .wx-row-label { font-weight: 500; }
+        .wx-row-val { font-family: monospace; background: #eee; padding: 1px 4px; border-radius: 3px; color: #333; }
 
         /* --- HANDLES --- */
         .target-handle {
-            width: 10px; height: 10px; background: #666; border: 2px solid white;
+            width: 10px; height: 10px; background: #adb5bd; border: 2px solid white;
             left: -6px; top: 20px !important; z-index: 10;
         }
 
         .source-handle {
-            width: 8px; height: 8px; background: #666; border: 2px solid white;
-            right: -5px; /* Stick out slightly */
-            top: 50% !important; /* Center vertically in the ROW */
+            width: 8px; height: 8px; background: #6c757d; border: 2px solid white;
+            right: -5px; /* Stick out */
+            top: 50% !important;
             transform: translateY(-50%);
             z-index: 10;
         }
         
-        /* Error Screen */
         #crash-screen { padding: 40px; color: #721c24; background: #f8d7da; display: none; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 9999; }
     </style>
 
@@ -132,36 +137,32 @@
             document.getElementById('crash-msg').innerText = `${msg}\nLine: ${line}`;
         };
 
-        // --- 1. CONFIGURATION ---
         const CONFIG = {
             'start': { color: '#28a745', icon: 'fa-play', label: 'Start' },
             'event': { color: '#28a745', icon: 'fa-bolt', label: 'Event' },
             'disconnect-contact': { color: '#dc3545', icon: 'fa-stop', label: 'End' },
-            
             'ivr-menu': { color: '#fd7e14', icon: 'fa-list-ul', label: 'Menu' },
             'case-statement': { color: '#fd7e14', icon: 'fa-code-branch', label: 'Switch' },
             'condition-activity': { color: '#fd7e14', icon: 'fa-question', label: 'If/Else' },
-            
             'play-message': { color: '#007bff', icon: 'fa-volume-up', label: 'Play' },
             'queue-contact': { color: '#007bff', icon: 'fa-users', label: 'Queue' },
             'set-variable': { color: '#6f42c1', icon: 'fa-pen', label: 'Set Var' },
-            
-            'default': { color: '#6c757d', icon: 'fa-cog', label: 'Node' }
+            'default': { color: '#6c757d', icon: 'fa-cog', label: 'Activity' }
         };
 
-        // --- 2. NODE COMPONENT ---
+        // --- 1. NODE COMPONENT ---
         const WxNode = ({ data }) => {
-            const isDecision = data.outcomes && data.outcomes.length > 0;
+            // Check if we have multiple output branches
+            const hasOutcomes = data.outcomes && data.outcomes.length > 0;
 
             return (
                 <div className="wx-node">
-                    {/* INPUT HANDLE (Global Left) */}
+                    {/* Main Input */}
                     <Handle type="target" position={Position.Left} className="target-handle" />
 
-                    {/* Left Strip */}
+                    {/* Left Color Strip */}
                     <div className="wx-strip" style={{ backgroundColor: data.color }}></div>
 
-                    {/* Content */}
                     <div className="wx-content">
                         {/* Header */}
                         <div className="wx-header">
@@ -170,41 +171,41 @@
                             <div className="wx-type">{data.typeName}</div>
                         </div>
 
-                        {/* Info Box (e.g. Variable Name) */}
-                        {data.expression && (
-                            <div className="wx-info-box" title="Expression">
-                                {data.expression}
-                            </div>
-                        )}
-                        
-                        {/* Rows List (Outcomes or Properties) */}
-                        <div className="wx-row-list">
-                            {/* A. DECISION OUTCOMES (With Handles) */}
-                            {isDecision ? (
+                        {/* Info Body */}
+                        <div className="wx-info-body">
+                            {data.expression && (
+                                <div className="wx-condition-box" title="Variable Checked">
+                                    {data.expression}
+                                </div>
+                            )}
+                            
+                            {/* Standard Key-Values */}
+                            {data.rows && data.rows.map((r, i) => (
+                                <div key={i} style={{display:'flex', justifyContent:'space-between', marginBottom:'4px', fontSize:'11px', color:'#666'}}>
+                                    <span>{r.k}:</span>
+                                    <span style={{fontWeight:600, color:'#333'}}>{r.v}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Outcomes / Outputs */}
+                        <div className="wx-rows-container">
+                            {hasOutcomes ? (
                                 data.outcomes.map((outcome, i) => (
                                     <div key={i} className="wx-row-item">
-                                        <span className="wx-label">{outcome}</span>
+                                        <span className="wx-row-label">{outcome}</span>
                                         <Handle 
                                             type="source" 
                                             position={Position.Right} 
-                                            id={outcome} 
+                                            id={String(outcome)} // Ensure ID is string
                                             className="source-handle"
                                         />
                                     </div>
                                 ))
                             ) : (
-                                /* B. STANDARD PROPERTIES (No handles, just info) */
-                                data.rows && data.rows.map((r, i) => (
-                                    <div key={i} className="wx-row-item" style={{justifyContent:'space-between', border:'none', padding:'2px 0'}}>
-                                        <span style={{color:'#888'}}>{r.k}:</span>
-                                        <span style={{fontWeight:600}}>{r.v}</span>
-                                    </div>
-                                ))
-                            )}
-
-                            {/* C. DEFAULT OUTPUT (If not a decision node) */}
-                            {!isDecision && (
-                                <div style={{position:'absolute', right:0, top:'50%'}}>
+                                // Default Output
+                                <div className="wx-row-item" style={{justifyContent:'flex-end'}}>
+                                    <span style={{color:'#ccc', fontSize:'10px', marginRight:'6px'}}>Next</span>
                                     <Handle type="source" position={Position.Right} id="default" className="source-handle" />
                                 </div>
                             )}
@@ -215,7 +216,7 @@
         };
         const nodeTypes = { wxNode: WxNode };
 
-        // --- 3. PARSER ---
+        // --- 2. PARSER ---
         const parseFlow = (json) => {
             const nodes = [];
             const edges = [];
@@ -227,25 +228,38 @@
             const widgets = json.diagram?.widgets || {};
 
             Object.values(activities).forEach(act => {
-                const type = act.activityName || 'default';
-                const style = CONFIG[type] || CONFIG['default'];
+                const rawType = act.activityName || 'default';
+                const type = rawType.toLowerCase(); // Case-insensitive matching
+                
+                // Map config key
+                let configKey = 'default';
+                if (CONFIG[rawType]) configKey = rawType;
+                else if (type.includes('case')) configKey = 'case-statement';
+                else if (type.includes('menu')) configKey = 'ivr-menu';
+                else if (type.includes('play')) configKey = 'play-message';
+                
+                const style = CONFIG[configKey] || CONFIG['default'];
                 const props = act.properties || {};
                 
                 const rows = [];
                 let outcomes = [];
                 let expression = null;
 
-                // 1. DECISIONS
-                if (type === 'case-statement') {
+                // LOGIC: Branching Nodes
+                if (configKey === 'case-statement') {
                     if(props.expression) expression = props.expression;
                     if(props.cases) outcomes = Object.keys(props.cases);
+                    
+                    // WxCC quirk: sometimes case keys are numbers in JSON but strings in links
+                    outcomes = outcomes.map(String);
+                    
                     if(!outcomes.includes('Default')) outcomes.push('Default');
                 }
-                else if (type === 'ivr-menu') {
-                    if(props.menuLinks) outcomes = Object.keys(props.menuLinks);
+                else if (configKey === 'ivr-menu') {
+                    if(props.menuLinks) outcomes = Object.keys(props.menuLinks).map(String);
                     if(props.prompts?.[0]?.value) rows.push({k:'Prompt', v: props.prompts[0].value});
                 }
-                // 2. STANDARD
+                // LOGIC: Standard Nodes
                 else {
                     if(props.prompts?.[0]?.value) rows.push({k:'Audio', v: props.prompts[0].value});
                     if(props.updates) {
@@ -276,13 +290,24 @@
                     let label = link.conditionExpr || "default";
                     if(label === 'true') label = 'default';
                     
+                    // Attempt to map Edge Label to Handle ID
+                    let handleId = 'default';
+                    
+                    // If label looks like "variable == 'Value'", try to extract 'Value'
+                    // Simple heuristic: If the label is exactly one of the known outcomes (cases), use it.
+                    // This requires a second pass or a lookup, but for now we assume simple WxCC logic
+                    
+                    // For now, assume label IS the handle ID for simple cases
+                    handleId = label;
+
                     const isErr = label.toLowerCase().includes('error');
 
                     edges.push({
                         id: `${link.sourceActivityId}-${link.targetActivityId}`,
                         source: link.sourceActivityId,
                         target: link.targetActivityId,
-                        sourceHandle: label === 'default' ? 'default' : label,
+                        sourceHandle: handleId,
+                        label: label === 'default' ? '' : label,
                         type: 'smoothstep',
                         style: { stroke: isErr ? '#dc3545' : '#b1b1b7', strokeWidth: 2 },
                         animated: false
@@ -293,13 +318,16 @@
             return { nodes, edges };
         };
 
+        // --- 3. APP ---
         const App = () => {
             const [nodes, setNodes] = useState([]);
             const [edges, setEdges] = useState([]);
             const [fileName, setFileName] = useState('');
+            const [selectedNode, setSelectedNode] = useState(null);
 
             const onNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
             const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
+            const onNodeClick = useCallback((event, node) => setSelectedNode(node), []);
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
@@ -319,15 +347,24 @@
             return (
                 <>
                     <div className="controls-panel">
-                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>Visualizer v18</h6>
+                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>Visualizer v19</h6>
                         <input type="file" className="form-control form-control-sm mb-2" accept=".json" onChange={handleFileUpload} />
-                        {fileName && <div className="small text-muted">Active: <strong>{fileName}</strong></div>}
+                        {fileName && <div className="small text-muted mb-2">Active: <strong>{fileName}</strong></div>}
+                        
+                        {selectedNode && (
+                            <div className="bg-light border rounded p-2 mt-2" style={{maxHeight: '300px', overflow: 'auto', fontSize: '10px'}}>
+                                <strong>Selected:</strong> {selectedNode.data.label}
+                                <hr className="my-1"/>
+                                <pre className="m-0">{JSON.stringify(selectedNode.data.outcomes || "No Outcomes", null, 2)}</pre>
+                            </div>
+                        )}
                     </div>
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
+                        onNodeClick={onNodeClick}
                         nodeTypes={nodeTypes}
                         fitView
                     >
