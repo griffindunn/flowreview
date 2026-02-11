@@ -2,19 +2,397 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WxCC Flow Visualizer v6.0</title>
-    <meta name="app-version-html" content="v6.0">
+    <title>WxCC Flow Visualizer (Single File)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=6.0">
-</head>
-<body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
     <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-node-html-label@1.2.2/dist/cytoscape-node-html-label.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script src="app.js?v=6.0"></script>
+
+    <style>
+        body, html { height: 100%; width: 100%; overflow: hidden; background-color: #f4f4f4; margin: 0; padding: 0; }
+        
+        /* Main Graph Container */
+        #cy { width: 100%; height: 100%; display: block; z-index: 1; }
+
+        /* Floating Controls */
+        .controls-layer {
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            width: 280px; 
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        /* Loading Spinner */
+        #loadingOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 2000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+
+        /* Version Tag */
+        .version-tag {
+            position: fixed; bottom: 10px; left: 10px;
+            font-family: monospace; font-size: 10px; color: #888;
+            pointer-events: none; z-index: 100;
+        }
+
+        /* Print Styles */
+        @media print {
+            .controls-layer, .offcanvas, #loadingOverlay, .version-tag { display: none !important; }
+            #cy { height: 100vh; width: 100vw; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="version-tag">v7.0 (Single-File)</div>
+
+    <div id="loadingOverlay" class="d-none">
+        <div class="spinner-border text-primary" role="status"></div>
+        <div class="mt-2 small text-muted font-monospace">Processing...</div>
+    </div>
+
+    <div class="controls-layer">
+        <h6 class="fw-bold mb-3"><i class="fa-solid fa-diagram-project me-2"></i>Flow Visualizer</h6>
+        
+        <div class="mb-3">
+            <input type="file" id="fileInput" class="form-control form-control-sm" accept=".json">
+        </div>
+
+        <div class="d-flex gap-2 mb-3">
+            <button id="btnProcess" class="btn btn-primary btn-sm flex-grow-1" disabled>Visualize</button>
+            <button id="btnFit" class="btn btn-outline-secondary btn-sm" disabled><i class="fa-solid fa-compress"></i> Fit</button>
+        </div>
+
+        <div id="flowInfo" class="d-none border-top pt-2">
+            <div class="text-uppercase text-muted fw-bold" style="font-size: 10px;">Active Flow</div>
+            <div id="flowName" class="text-truncate fw-bold small mb-2 text-dark"></div>
+            <button id="btnPdf" class="btn btn-danger w-100 btn-sm"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+        </div>
+        
+        <div id="errorMsg" class="alert alert-danger mt-2 d-none py-1 px-2 small"></div>
+    </div>
+
+    <div id="cy"></div>
+
+    <div class="offcanvas offcanvas-end shadow" tabindex="-1" id="detailsPanel" data-bs-backdrop="false">
+        <div class="offcanvas-header border-bottom bg-light py-2">
+            <h6 class="offcanvas-title m-0" id="detailsTitle"><i class="fa-solid fa-circle-info me-2"></i>Node Config</h6>
+            <button type="button" class="btn-close btn-sm" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body p-0 bg-light">
+            <div class="p-3">
+                <pre id="detailsContent" class="bg-white border rounded p-3 small mb-0 shadow-sm" style="font-size: 11px; white-space: pre-wrap;"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        
+        // 1. REGISTER DAGRE LAYOUT
+        try {
+            if (typeof cytoscapeDagre !== 'undefined') {
+                cytoscape.use(cytoscapeDagre);
+            } else {
+                console.warn("Dagre extension not loaded");
+            }
+        } catch (e) { console.error(e); }
+
+        // 2. INITIALIZE CYTOSCAPE
+        let cy = cytoscape({
+            container: document.getElementById('cy'),
+            boxSelectionEnabled: false,
+            autounselectify: true,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'width': 220, 
+                        'height': 60,
+                        'background-opacity': 0, // Invisible backing node
+                        'border-width': 0
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 1.5,
+                        'curve-style': 'bezier',
+                        'line-color': '#adb5bd',
+                        'target-arrow-color': '#adb5bd',
+                        'target-arrow-shape': 'triangle',
+                        'arrow-scale': 1.2,
+                        'font-size': '9px',
+                        'color': '#6c757d',
+                        'text-background-color': '#f4f4f4',
+                        'text-background-opacity': 1,
+                        'text-background-padding': 2,
+                        'text-rotation': 'autorotate',
+                        'label': 'data(label)'
+                    }
+                },
+                {
+                    selector: 'edge[isError="true"]',
+                    style: {
+                        'line-color': '#dc3545',
+                        'target-arrow-color': '#dc3545',
+                        'color': '#dc3545'
+                    }
+                }
+            ],
+            layout: { name: 'preset' }
+        });
+
+        // 3. ENABLE HTML LABELS (Visual Cards)
+        if(cy.nodeHtmlLabel) {
+            cy.nodeHtmlLabel([{
+                query: 'node',
+                valign: "center", halign: "center", valignBox: "center", halignBox: "center",
+                tpl: function(data) { return generateNodeHtml(data); }
+            }]);
+        } else {
+            alert("Error: HTML Label Extension missing. Please refresh.");
+        }
+
+        // 4. UI INTERACTION
+        const fileInput = document.getElementById('fileInput');
+        const btnProcess = document.getElementById('btnProcess');
+        const btnFit = document.getElementById('btnFit');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        let selectedFile = null;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                btnProcess.disabled = false;
+            }
+        });
+
+        btnProcess.addEventListener('click', () => {
+            if (!selectedFile) return;
+            loadingOverlay.classList.remove('d-none');
+
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        const elements = parseWxCCFlow(json);
+                        
+                        if (elements.length === 0) throw new Error("No nodes found in JSON.");
+
+                        cy.elements().remove();
+                        cy.add(elements);
+                        
+                        cy.layout({ name: 'preset' }).run();
+                        setTimeout(() => cy.fit(50), 200);
+
+                        document.getElementById('flowInfo').classList.remove('d-none');
+                        document.getElementById('flowName').innerText = json.name || selectedFile.name;
+                        document.getElementById('errorMsg').classList.add('d-none');
+                        btnFit.disabled = false;
+
+                    } catch (err) {
+                        console.error(err);
+                        const el = document.getElementById('errorMsg');
+                        el.innerText = "Error: " + err.message;
+                        el.classList.remove('d-none');
+                    } finally {
+                        loadingOverlay.classList.add('d-none');
+                    }
+                };
+                reader.readAsText(selectedFile);
+            }, 100);
+        });
+
+        btnFit.addEventListener('click', () => cy.fit(50));
+        
+        document.getElementById('btnPdf').addEventListener('click', () => {
+            cy.fit(20); 
+            setTimeout(() => window.print(), 500);
+        });
+
+        cy.on('tap', 'node', (evt) => {
+            const nodeData = evt.target.data();
+            document.getElementById('detailsContent').textContent = JSON.stringify(nodeData.raw, null, 2);
+            new bootstrap.Offcanvas(document.getElementById('detailsPanel')).show();
+        });
+
+        // 5. PARSER LOGIC
+        function parseWxCCFlow(json) {
+            let nodes = [];
+            let edges = [];
+
+            // Robust check for structure
+            if (!json.process || !json.process.activities || !json.process.links) {
+                return [];
+            }
+
+            const activities = json.process.activities; 
+            const links = json.process.links;
+            const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
+
+            // Nodes
+            Object.values(activities).forEach(act => {
+                const style = getWxNodeStyle(act);
+                const posX = widgets[act.id]?.point?.x || 0;
+                const posY = widgets[act.id]?.point?.y || 0;
+
+                nodes.push({
+                    data: { 
+                        id: act.id, 
+                        title: act.name || "Unknown",
+                        subtitle: style.subtitle,
+                        icon: style.icon,
+                        barColor: style.barColor,
+                        rows: style.dataRows,
+                        raw: act
+                    },
+                    position: { x: posX, y: posY }
+                });
+            });
+
+            // Edges
+            links.forEach(link => {
+                let label = link.conditionExpr || "";
+                if(label === 'true') label = '';
+                if(label === 'false') label = 'Else';
+                
+                const isError = label.toLowerCase().includes('error') || 
+                                label.toLowerCase().includes('timeout') || 
+                                link.type === 'error';
+
+                if (link.sourceActivityId && link.targetActivityId) {
+                    edges.push({
+                        data: {
+                            source: link.sourceActivityId,
+                            target: link.targetActivityId,
+                            label: label,
+                            isError: isError.toString()
+                        }
+                    });
+                }
+            });
+
+            return [...nodes, ...edges];
+        }
+
+        // 6. STYLE MAPPINGS (Replicating WxCC Colors)
+        function getWxNodeStyle(act) {
+            const type = act.activityName;
+            const props = act.properties || {};
+            
+            let s = { icon: 'fa-gear', barColor: '#6c757d', subtitle: type, dataRows: [] };
+
+            switch (type) {
+                case 'start':
+                case 'event':
+                case 'NewPhoneContact':
+                    s.icon = 'fa-play'; s.barColor = '#2fb755'; s.subtitle = 'Start Flow';
+                    if(props.event) s.dataRows.push({k:'Event', v:props.event});
+                    break;
+                
+                case 'disconnect-contact':
+                    s.icon = 'fa-phone-slash'; s.barColor = '#d63939'; s.subtitle = 'Disconnect';
+                    break;
+
+                case 'set-variable':
+                case 'parse-activity':
+                    s.icon = 'fa-code'; s.barColor = '#9f67cc'; s.subtitle = 'Calculation';
+                    if(props.updates) {
+                        const keys = Object.keys(props.updates);
+                        if(keys[0]) s.dataRows.push({k:'Set', v:keys[0]});
+                    }
+                    break;
+
+                case 'ivr-menu':
+                case 'case-statement':
+                case 'enum-gateway':
+                case 'condition-activity':
+                    s.icon = 'fa-share-nodes'; s.barColor = '#ff9d00'; s.subtitle = 'Decision';
+                    if(props.cases) s.dataRows.push({k:'Cases', v: Object.keys(props.cases).length});
+                    if(props.menuLinks) s.dataRows.push({k:'Opts', v: Object.keys(props.menuLinks).length});
+                    if(props.expression) s.dataRows.push({k:'Expr', v: props.expression});
+                    break;
+
+                case 'play-message':
+                case 'queue-contact':
+                case 'feedback':
+                case 'Feedback-V2':
+                    s.icon = 'fa-volume-high'; s.barColor = '#00a0d1'; s.subtitle = 'Action';
+                    if(type.includes('feedback')) { s.icon = 'fa-comment-dots'; s.subtitle = 'Survey'; }
+                    if(type.includes('queue')) { s.icon = 'fa-users'; s.subtitle = 'Queue'; }
+                    
+                    if(props.prompts && props.prompts[0]) {
+                        let p = props.prompts[0].value || "Var";
+                        if(p.length > 20) p = p.substring(0,18) + "..";
+                        s.dataRows.push({k:'Msg', v: p});
+                    }
+                    break;
+                
+                case 'run-script':
+                    s.icon = 'fa-scroll'; s.barColor = '#9f67cc'; s.subtitle = 'Script';
+                    break;
+            }
+            return s;
+        }
+
+        // 7. HTML GENERATOR (Inline Styles for reliability)
+        function generateNodeHtml(data) {
+            const rowsHtml = data.rows.map(r => `
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid #f0f0f0; padding-top: 3px; margin-top: 3px;">
+                    <span style="color: #666; margin-right: 6px; font-size: 10px;">${r.k}:</span>
+                    <span style="font-family: monospace; color: #222; font-weight: 600; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;" title="${r.v}">${r.v}</span>
+                </div>
+            `).join('');
+
+            return `
+                <div style="
+                    width: 220px; 
+                    min-height: 50px; 
+                    background-color: #ffffff; 
+                    border-radius: 4px; 
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.15); 
+                    display: flex; 
+                    overflow: hidden; 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                    border: 1px solid #dcdcdc;
+                    text-align: left;
+                ">
+                    <div style="
+                        width: 32px; 
+                        background-color: ${data.barColor}; 
+                        display: flex; align-items: center; justify-content: center; 
+                        color: white; font-size: 14px;
+                    ">
+                        <i class="fa-solid ${data.icon}"></i>
+                    </div>
+                    
+                    <div style="flex-grow: 1; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                        <div style="font-weight: 700; font-size: 11px; color: #222; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${data.title}
+                        </div>
+                        <div style="font-size: 9px; color: #888; margin-bottom: 3px; font-style: italic;">
+                            ${data.subtitle}
+                        </div>
+                        <div>${rowsHtml}</div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    </script>
 </body>
 </html>
