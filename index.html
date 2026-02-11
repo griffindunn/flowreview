@@ -2,32 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WxCC Flow Visualizer v9.0</title>
+    <title>WxCC Flow Visualizer v10.0</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
     <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
-        body, html { height: 100%; width: 100%; overflow: hidden; background-color: #f4f4f4; margin: 0; }
+        body, html { height: 100%; width: 100%; overflow: hidden; background-color: #f0f0f0; margin: 0; }
         #cy { width: 100%; height: 100%; display: block; }
 
-        /* Floating Controls */
         .controls-layer {
             position: absolute; top: 20px; left: 20px; width: 280px; z-index: 100;
-            background: rgba(255, 255, 255, 0.95); border: 1px solid #ccc;
+            background: rgba(255, 255, 255, 0.98); border: 1px solid #ccc;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 6px; padding: 15px;
         }
 
-        /* Loading Spinner */
         #loadingOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.9); z-index: 2000;
+            background: rgba(255,255,255,0.95); z-index: 2000;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
     </style>
@@ -36,11 +32,11 @@
 
     <div id="loadingOverlay" class="d-none">
         <div class="spinner-border text-primary" role="status"></div>
-        <div class="mt-2 small fw-bold text-secondary">Generating Nodes...</div>
+        <div class="mt-2 small fw-bold text-secondary">Generating High-Fidelity Nodes...</div>
     </div>
 
     <div class="controls-layer">
-        <h6 class="fw-bold mb-3"><i class="fa-solid fa-code-branch me-2"></i>Visualizer v9.0</h6>
+        <h6 class="fw-bold mb-3">Flow Visualizer v10</h6>
         <input type="file" id="fileInput" class="form-control form-control-sm mb-3" accept=".json">
         
         <div class="d-flex gap-2 mb-2">
@@ -59,7 +55,7 @@
 
     <div class="offcanvas offcanvas-end shadow" tabindex="-1" id="detailsPanel" data-bs-backdrop="false">
         <div class="offcanvas-header border-bottom bg-light py-2">
-            <h6 class="offcanvas-title m-0"><i class="fa-solid fa-circle-info me-2"></i>Node Config</h6>
+            <h6 class="offcanvas-title m-0">Node Config</h6>
             <button type="button" class="btn-close btn-sm" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body bg-light p-0">
@@ -72,8 +68,18 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         
-        // 1. Register Layout
         try { if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre); } catch(e){}
+
+        // --- ICON PATHS (Embedded SVG Data) ---
+        // We use paths directly so we don't rely on fonts loading
+        const ICONS = {
+            play: "M8 5v14l11-7z", // Triangle
+            stop: "M6 6h12v12H6z", // Square
+            gear: "M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z",
+            branch: "M19,3H5C3.89,3,3,3.9,3,5v14c0,1.1,0.89,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.11,3,19,3z M17,17h-2v-4l-4-3l-4,3v4H5v-5 l6-4.5L17,12V17z",
+            user: "M12,12c2.21,0,4-1.79,4-4s-1.79-4-4-4S8,5.79,8,8S9.79,12,12,12z M12,14c-2.67,0-8,1.34-8,4v2h16v-2C20,15.34,14.67,14,12,14z",
+            message: "M20,2H4C2.9,2,2,2.9,2,4v18l4-4h14c1.1,0,2-0.9,2-2V4C22,2.9,21.1,2,20,2z"
+        };
 
         // 2. Init Cytoscape
         let cy = cytoscape({
@@ -85,9 +91,9 @@
                     style: {
                         'shape': 'rectangle',
                         'width': 240,
-                        'height': 80,
-                        'background-color': 'transparent', // We draw our own background via SVG
-                        'background-image': 'data(svg)',   // The Magic: SVG rendered as image
+                        'height': 70,
+                        'background-color': 'transparent', 
+                        'background-image': 'data(svg)',   // Load SVG string as image
                         'background-fit': 'contain',
                         'border-width': 0
                     }
@@ -103,12 +109,11 @@
                         'font-size': '10px',
                         'color': '#444',
                         'text-background-color': '#fff',
-                        'text-background-opacity': 0.8,
+                        'text-background-opacity': 0.9,
                         'label': 'data(label)',
                         'text-rotation': 'autorotate'
                     }
                 },
-                // Red Error Lines
                 {
                     selector: 'edge[isError="true"]',
                     style: { 'line-color': '#dc3545', 'target-arrow-color': '#dc3545', 'color': '#dc3545' }
@@ -117,7 +122,7 @@
             layout: { name: 'preset' }
         });
 
-        // 3. UI Logic
+        // 3. Logic
         const fileInput = document.getElementById('fileInput');
         const btnProcess = document.getElementById('btnProcess');
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -174,72 +179,63 @@
             new bootstrap.Offcanvas(document.getElementById('detailsPanel')).show();
         });
 
-        // --- 4. THE SVG GENERATOR (The "Split Card" Engine) ---
+        // --- SVG GENERATOR (The "Split Card" Engine) ---
         function createNodeSVG(data) {
             const width = 240;
-            const height = 80;
+            const height = 70;
             const barWidth = 36;
             
-            // Map colorClass to Hex
             const colors = {
-                'bg-green': '#2fb755', // Start
-                'bg-purple': '#9f67cc', // Parse
-                'bg-orange': '#ff9d00', // Switch
-                'bg-blue':   '#00a0d1', // Queue
-                'bg-gray':   '#6c757d', // End
-                'bg-red':    '#d63939'  // Error
+                'bg-green': '#2fb755',
+                'bg-purple': '#9f67cc',
+                'bg-orange': '#ff9d00',
+                'bg-blue':   '#00a0d1',
+                'bg-gray':   '#6c757d',
+                'bg-red':    '#d63939'
             };
             const barColor = colors[data.colorClass] || '#666';
+            const iconPath = ICONS[data.icon] || ICONS.gear;
 
-            // Escape text for SVG
             const safeTitle = (data.title || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             const safeSub = (data.subtitle || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-            // Build Data Rows
             let rowsSvg = "";
-            let yPos = 50;
+            let yPos = 45;
             if (data.rows && data.rows.length > 0) {
-                data.rows.slice(0, 2).forEach(row => { // Max 2 rows
+                data.rows.slice(0, 2).forEach(row => {
                     const k = (row.k + ":").replace(/&/g, "&amp;");
                     const v = (row.v || "").replace(/&/g, "&amp;");
                     rowsSvg += `
-                        <text x="${barWidth + 10}" y="${yPos}" font-family="Arial" font-size="10" fill="#666">${k}</text>
-                        <text x="${width - 10}" y="${yPos}" font-family="Consolas, monospace" font-size="10" fill="#222" text-anchor="end">${v}</text>
+                        <text x="${barWidth + 10}" y="${yPos}" font-family="Arial, sans-serif" font-size="10" fill="#666">${k}</text>
+                        <text x="${width - 10}" y="${yPos}" font-family="Consolas, monospace" font-size="10" fill="#222" text-anchor="end" font-weight="bold">${v}</text>
                     `;
                     yPos += 14;
                 });
             }
 
-            // Construct SVG String
             const svgString = `
                 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
                     <defs>
                         <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-                            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.15"/>
+                            <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.2"/>
                         </filter>
                     </defs>
-                    
-                    <rect x="2" y="2" width="${width-4}" height="${height-4}" rx="4" ry="4" fill="white" stroke="#dcdcdc" stroke-width="1" filter="url(#shadow)" />
-                    
+                    <rect x="2" y="2" width="${width-4}" height="${height-4}" rx="4" ry="4" fill="white" stroke="#ccc" stroke-width="1" filter="url(#shadow)" />
                     <path d="M 2 2 L ${barWidth} 2 L ${barWidth} ${height-2} L 2 ${height-2} Q 2 ${height-2} 2 ${height-6} L 2 6 Q 2 2 6 2 Z" fill="${barColor}" />
-                    
-                    <circle cx="${barWidth/2 + 2}" cy="${height/2}" r="8" fill="white" fill-opacity="0.2" />
-                    
+                    <g transform="translate(6, 23) scale(1)">
+                        <path d="${iconPath}" fill="white"/>
+                    </g>
                     <text x="${barWidth + 10}" y="20" font-family="Segoe UI, Arial, sans-serif" font-weight="bold" font-size="11" fill="#333">${safeTitle}</text>
-                    
-                    <text x="${barWidth + 10}" y="34" font-family="Segoe UI, Arial, sans-serif" font-style="italic" font-size="10" fill="#888">${safeSub}</text>
-                    
-                    <line x1="${barWidth}" y1="38" x2="${width}" y2="38" stroke="#f0f0f0" stroke-width="1" />
-                    
+                    <text x="${barWidth + 10}" y="32" font-family="Segoe UI, Arial, sans-serif" font-style="italic" font-size="9" fill="#888">${safeSub}</text>
+                    <line x1="${barWidth}" y1="36" x2="${width}" y2="36" stroke="#f0f0f0" stroke-width="1" />
                     ${rowsSvg}
                 </svg>
             `;
 
-            // Convert SVG to Data URI
             return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
         }
 
-        // --- 5. PARSER ---
+        // --- PARSER ---
         function parseWxCCFlow(json) {
             let nodes = [];
             let edges = [];
@@ -250,19 +246,16 @@
             const links = json.process.links;
             const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
 
-            // Parse Nodes
             Object.values(activities).forEach(act => {
                 const style = getWxNodeStyle(act);
-                
-                // Truncate title for SVG
                 let displayTitle = act.name || "Unknown";
                 if(displayTitle.length > 25) displayTitle = displayTitle.substring(0, 23) + "..";
 
-                // Generate SVG Data URI
                 const svgData = createNodeSVG({
                     title: displayTitle,
                     subtitle: style.subtitle,
                     colorClass: style.bgClass,
+                    icon: style.icon,
                     rows: style.dataRows
                 });
 
@@ -270,72 +263,58 @@
                 let posY = widgets[act.id]?.point?.y || 0;
 
                 nodes.push({
-                    data: { 
-                        id: act.id, 
-                        svg: svgData, // Provide SVG to Cytoscape
-                        raw: act
-                    },
+                    data: { id: act.id, svg: svgData, raw: act },
                     position: { x: posX, y: posY }
                 });
             });
 
-            // Parse Edges
             links.forEach(link => {
                 let label = link.conditionExpr || "";
                 if(label === 'true') label = '';
                 if(label === 'false') label = 'Else';
-                
-                const isError = label.toLowerCase().includes('error') || 
-                                label.toLowerCase().includes('timeout') || 
-                                link.type === 'error';
+                const isError = label.toLowerCase().includes('error') || label.toLowerCase().includes('timeout') || link.type === 'error';
 
                 if (link.sourceActivityId && link.targetActivityId) {
                     edges.push({
                         data: {
-                            source: link.sourceActivityId,
-                            target: link.targetActivityId,
-                            label: label,
-                            isError: isError.toString()
+                            source: link.sourceActivityId, target: link.targetActivityId,
+                            label: label, isError: isError.toString()
                         }
                     });
                 }
             });
-
             return [...nodes, ...edges];
         }
 
-        // --- 6. STYLE LOGIC ---
+        // --- STYLE MAPPER ---
         function getWxNodeStyle(act) {
             const type = act.activityName;
             const props = act.properties || {};
-            let s = { bgClass: 'bg-gray', subtitle: type, dataRows: [] };
+            let s = { bgClass: 'bg-gray', subtitle: type, icon: 'gear', dataRows: [] };
 
             switch (type) {
                 case 'start':
                 case 'event':
                 case 'NewPhoneContact':
-                    s.bgClass = 'bg-green'; s.subtitle = 'Start Flow';
+                    s.bgClass = 'bg-green'; s.subtitle = 'Start Flow'; s.icon = 'play';
                     if(props.event) s.dataRows.push({k:'Event', v:props.event});
                     break;
-                
                 case 'disconnect-contact':
-                    s.bgClass = 'bg-gray'; s.subtitle = 'End Flow';
+                    s.bgClass = 'bg-gray'; s.subtitle = 'End Flow'; s.icon = 'stop';
                     break;
-
                 case 'set-variable':
                 case 'parse-activity':
-                    s.bgClass = 'bg-purple'; s.subtitle = 'Calculation';
+                    s.bgClass = 'bg-purple'; s.subtitle = 'Calculation'; s.icon = 'gear';
                     if(props.updates) {
                         const keys = Object.keys(props.updates);
                         if(keys[0]) s.dataRows.push({k:'Set', v:keys[0]});
                     }
                     break;
-
                 case 'ivr-menu':
                 case 'case-statement':
                 case 'enum-gateway':
                 case 'condition-activity':
-                    s.bgClass = 'bg-orange'; s.subtitle = 'Decision';
+                    s.bgClass = 'bg-orange'; s.subtitle = 'Decision'; s.icon = 'branch';
                     if(props.cases) s.dataRows.push({k:'Cases', v: Object.keys(props.cases).length});
                     if(props.menuLinks) s.dataRows.push({k:'Opts', v: Object.keys(props.menuLinks).length + " Links"});
                     if(props.expression) {
@@ -344,24 +323,21 @@
                         s.dataRows.push({k:'Expr', v: expr});
                     }
                     break;
-
                 case 'play-message':
                 case 'queue-contact':
                 case 'feedback':
                 case 'Feedback-V2':
-                    s.bgClass = 'bg-blue'; s.subtitle = 'Action';
-                    if(type.includes('feedback')) s.subtitle = 'Survey';
-                    if(type.includes('queue')) s.subtitle = 'Queue';
-                    
+                    s.bgClass = 'bg-blue'; s.subtitle = 'Action'; s.icon = 'message';
+                    if(type.includes('feedback')) { s.subtitle = 'Survey'; s.icon = 'message'; }
+                    if(type.includes('queue')) { s.subtitle = 'Queue'; s.icon = 'user'; }
                     if(props.prompts && props.prompts[0]) {
                         let p = props.prompts[0].value || "Var";
                         if(p.length > 18) p = p.substring(0,16) + "..";
                         s.dataRows.push({k:'Msg', v: p});
                     }
                     break;
-                
                 case 'run-script':
-                    s.bgClass = 'bg-purple'; s.subtitle = 'Script';
+                    s.bgClass = 'bg-purple'; s.subtitle = 'Script'; s.icon = 'gear';
                     break;
             }
             return s;
