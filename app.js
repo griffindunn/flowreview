@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize Cytoscape with a preset layout to save resources on load
     let cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
@@ -43,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         ],
-        layout: { name: 'preset' } // Start with no layout to save resources
+        layout: { name: 'preset' }
     });
 
     const fileInput = document.getElementById('fileInput');
@@ -55,10 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedFile = null;
 
-    // 1. Handle File Selection (Just enables the button)
+    // 1. Handle File Selection
     fileInput.addEventListener('change', (event) => {
         if (event.target.files.length > 0) {
             selectedFile = event.target.files[0];
+            // ENABLE THE BUTTON when file is picked
             btnProcess.disabled = false;
             errorMsg.classList.add('d-none');
         } else {
@@ -66,41 +68,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 2. Handle "Visualize" Click (Does the heavy lifting)
+    // 2. Handle "Visualize" Click
     btnProcess.addEventListener('click', () => {
         if (!selectedFile) return;
 
         // Show loading spinner
         loadingOverlay.classList.remove('d-none');
 
-        // Use setTimeout to allow the UI to render the spinner before blocking with JS
+        // Use setTimeout to let the browser render the spinner before freezing
         setTimeout(() => {
             const reader = new FileReader();
             
             reader.onload = (e) => {
                 try {
                     const json = JSON.parse(e.target.result);
-                    
                     const elements = parseFlowBuilderJson(json);
                     
                     if (elements.length === 0) {
                         throw new Error("Parsed 0 nodes. Check JSON structure.");
                     }
 
-                    // Reset and Load
                     cy.elements().remove();
                     cy.add(elements);
 
-                    // Run Layout
+                    // Run Heavy Layout Calculation
                     cy.layout({ 
                         name: 'dagre', 
                         rankDir: 'LR', 
                         nodeSep: 50, 
                         rankSep: 100,
-                        animate: false // Disable animation for speed
+                        animate: false 
                     }).run();
 
-                    // Update UI
                     flowInfo.classList.remove('d-none');
                     flowNameDisplay.innerText = json.name || selectedFile.name;
                     errorMsg.classList.add('d-none');
@@ -110,16 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     errorMsg.innerText = "Error: " + err.message;
                     errorMsg.classList.remove('d-none');
                 } finally {
-                    // Hide spinner regardless of success/fail
+                    // Hide spinner
                     loadingOverlay.classList.add('d-none');
                 }
             };
 
             reader.readAsText(selectedFile);
-        }, 100); // 100ms delay to ensure spinner appears
+        }, 100);
     });
 
-    // PDF / Print Handler
+    // PDF Handler
     document.getElementById('btnPdf').addEventListener('click', () => {
         window.print();
     });
@@ -129,8 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let nodes = [];
         let edges = [];
 
+        // Check for Flow Builder structure
         if (!json.process || !json.process.activities || !json.process.links) {
-            // Fallback for older formats if needed, or return empty
             return []; 
         }
 
