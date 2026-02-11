@@ -1,132 +1,54 @@
 document.addEventListener('DOMContentLoaded', () => {
-    let cy = cytoscape({
-        container: document.getElementById('cy'),
-        style: [
-            {
-                selector: 'node',
-                style: {
-                    'background-color': '#0d6efd',
-                    'label': 'data(label)',
-                    'color': '#fff',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'shape': 'round-rectangle',
-                    'width': 'label',
-                    'padding': '10px',
-                    'font-size': '12px'
-                }
-            },
-            {
-                selector: 'edge',
-                style: {
-                    'width': 2,
-                    'line-color': '#ccc',
-                    'target-arrow-color': '#ccc',
-                    'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
-                    'label': 'data(label)',
-                    'font-size': '10px',
-                    'text-background-color': '#fff',
-                    'text-background-opacity': 1
-                }
-            }
-        ],
-        layout: { name: 'dagre', rankDir: 'LR' }
-    });
-
+    // Grab the file input from the HTML
     const fileInput = document.getElementById('fileInput');
-    const flowInfo = document.getElementById('flowInfo');
-    const flowNameDisplay = document.getElementById('flowName');
-    const errorMsg = document.getElementById('errorMsg');
+    
+    // Create a debug display area at the bottom of the page
+    const debugArea = document.createElement('div');
+    debugArea.style.padding = "20px";
+    debugArea.style.marginTop = "20px";
+    debugArea.style.backgroundColor = "#f8f9fa";
+    debugArea.style.borderTop = "2px solid #333";
+    debugArea.style.fontFamily = "monospace";
+    debugArea.style.whiteSpace = "pre-wrap"; // Preserves formatting
+    document.body.appendChild(debugArea);
 
-    // 1. Handle Upload
     fileInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (!file) return;
 
+        debugArea.innerHTML = `<strong>Analyzing file:</strong> ${file.name}\n`;
+
         const reader = new FileReader();
+        
+        // 1. If this fails, the file is not text (e.g., it's a binary zip)
         reader.onload = (e) => {
             try {
-                const json = JSON.parse(e.target.result);
-                console.log("Loaded JSON:", json); // Debugging: See what we loaded
+                const rawText = e.target.result;
+                debugArea.innerHTML += `✅ File read successfully (${rawText.length} bytes).\n`;
                 
-                // Clear previous errors
-                errorMsg.classList.add('d-none');
+                // 2. Try to parse JSON
+                const json = JSON.parse(rawText);
+                debugArea.innerHTML += `✅ JSON Parsed successfully.\n`;
+                debugArea.innerHTML += `------------------------------------------------\n`;
                 
-                // Attempt to parse
-                const elements = parseWxCCJSON(json);
-                
-                if (elements.length === 0) {
-                    throw new Error("No nodes found. JSON structure might be different.");
-                }
+                // 3. Print the Root Keys (This tells us the structure)
+                const keys = Object.keys(json);
+                debugArea.innerHTML += `<strong>Root Keys Found:</strong> [ ${keys.join(', ')} ]\n\n`;
 
-                // Render
-                cy.elements().remove();
-                cy.add(elements);
-                cy.layout({ name: 'dagre', rankDir: 'LR', animate: true }).run();
-
-                // Update UI
-                flowInfo.classList.remove('d-none');
-                flowNameDisplay.innerText = json.name || file.name;
+                // 4. Check for common WxCC patterns
+                if (json.steps) debugArea.innerHTML += `Found 'steps' array with ${json.steps.length} items.\n`;
+                if (json.nodes) debugArea.innerHTML += `Found 'nodes' array with ${json.nodes.length} items.\n`;
+                if (json.graph) debugArea.innerHTML += `Found 'graph' object. Keys: [${Object.keys(json.graph).join(', ')}]\n`;
+                
+                debugArea.innerHTML += `\n<strong>Preview of first 200 characters:</strong>\n`;
+                debugArea.innerHTML += JSON.stringify(json, null, 2).substring(0, 200) + "...";
 
             } catch (err) {
-                console.error(err);
-                errorMsg.innerText = "Error: " + err.message;
-                errorMsg.classList.remove('d-none');
+                debugArea.innerHTML += `\n❌ <strong>CRITICAL ERROR:</strong>\n${err.message}\n`;
+                debugArea.innerHTML += `\nPossible Cause: The file might be a ZIP file, or contain invalid characters.`;
             }
         };
+
         reader.readAsText(file);
     });
-
-    // 2. Handle PDF Export
-    document.getElementById('btnPdf').addEventListener('click', () => {
-        // We use the browser's native print, but CSS hides everything except the graph
-        window.print(); 
-    });
-
-    // 3. ROBUST PARSER
-    function parseWxCCJSON(json) {
-        let nodes = [];
-        let edges = [];
-
-        // STRATEGY: Find the array of steps. WxCC structure changes often.
-        // We look for common keys: 'steps', 'nodes', 'activities'
-        let steps = json.steps || json.nodes || (json.graph && json.graph.steps);
-
-        // If 'steps' is still undefined, try looking deeper (Analyzer format)
-        if (!steps && json.flow) steps = json.flow.steps;
-        
-        if (!steps || !Array.isArray(steps)) {
-            console.error("Could not find a 'steps' or 'nodes' array in this JSON.");
-            return [];
-        }
-
-        steps.forEach(step => {
-            // NODE
-            nodes.push({
-                data: { 
-                    id: step.id, 
-                    label: step.name || step.displayName || step.type || "Unknown" 
-                }
-            });
-
-            // EDGES (Connections)
-            // Look for 'links', 'transitions', or 'connections'
-            const links = step.links || step.transitions || step.connections || [];
-            
-            links.forEach(link => {
-                // Target ID often under: 'to', 'target', 'targetStepId'
-                const target = link.to || link.target || link.targetStepId;
-                const label = link.label || link.condition || link.nodeOutput || "";
-
-                if (target) {
-                    edges.push({
-                        data: { source: step.id, target: target, label: label }
-                    });
-                }
-            });
-        });
-
-        return [...nodes, ...edges];
-    }
 });
