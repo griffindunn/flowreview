@@ -1,13 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
     
     // --- FIX: REGISTER DAGRE EXTENSION ---
-    // This tells Cytoscape to use the Dagre layout library we loaded in index.html
+    // This connects the dagre layout library to the core cytoscape library
     try {
-        if (window.cytoscapeDagre) {
-            cytoscape.use(window.cytoscapeDagre);
+        if (typeof cytoscapeDagre !== 'undefined') {
+            cytoscape.use(cytoscapeDagre);
+        } else {
+            console.warn("cytoscape-dagre library not found! The layout might fail.");
         }
     } catch (e) {
-        console.warn("Dagre registration warning:", e);
+        console.error("Failed to register dagre extension:", e);
     }
     // -------------------------------------
 
@@ -55,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         ],
-        layout: { name: 'preset' } // Start with no layout
+        layout: { name: 'preset' } // Start with no layout to save resources
     });
 
     const fileInput = document.getElementById('fileInput');
@@ -85,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show loading spinner
         loadingOverlay.classList.remove('d-none');
 
-        // Use setTimeout to let the browser render the spinner before freezing
+        // Use setTimeout to allow UI to render spinner before heavy processing
         setTimeout(() => {
             const reader = new FileReader();
             
@@ -137,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let nodes = [];
         let edges = [];
 
-        // Check for Flow Builder structure
         if (!json.process || !json.process.activities || !json.process.links) {
             return []; 
         }
