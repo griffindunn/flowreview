@@ -21,14 +21,30 @@
             width: 300px;
         }
 
-        /* Hide controls when printing/exporting */
+        /* Version Tag */
+        .version-tag {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.05);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #666;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
         @media print {
-            .controls-layer { display: none !important; }
+            .controls-layer, .version-tag { display: none !important; }
             #cy { height: 100vh; width: 100vw; }
         }
     </style>
 </head>
 <body>
+
+    <div class="version-tag">App Version: v1.3 (FlowBuilder Parser)</div>
 
     <div class="controls-layer">
         <h5 class="mb-3">Flow Visualizer</h5>
@@ -52,7 +68,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape-dagre/2.5.0/cytoscape-dagre.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
