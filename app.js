@@ -1,36 +1,29 @@
-const JS_VERSION = "v5.1";
+const JS_VERSION = "v6.0";
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. INJECT STYLES DIRECTLY (Bypasses CSS Cache Issues)
-    injectCriticalStyles();
-    
-    // 2. Display Version Dashboard
+    // 1. Version Dashboard
     displayVersions();
 
-    // 3. Register Extensions
+    // 2. Register Extensions
     try {
         if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre);
     } catch (e) { console.warn(e); }
 
-    // 4. Cytoscape Init
+    // 3. Cytoscape Init
     let cy = cytoscape({
         container: document.getElementById('cy'),
         boxSelectionEnabled: false,
         autounselectify: true,
         style: [
-            // GHOST NODE: We make the actual Cytoscape node invisible
-            // The HTML Label sits on top of this empty space
             {
                 selector: 'node',
                 style: {
                     'width': 240, 
                     'height': 80, 
-                    'background-opacity': 0, // INVISIBLE
-                    'border-width': 0,
-                    'label': '' // NO TEXT
+                    'background-opacity': 0, // Invisible backing node
+                    'border-width': 0
                 }
             },
-            // EDGES
             {
                 selector: 'edge',
                 style: {
@@ -40,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     'target-arrow-color': '#adb5bd',
                     'target-arrow-shape': 'triangle',
                     'arrow-scale': 1.2,
-                    'label': 'data(label)',
                     'font-size': '10px',
                     'color': '#495057',
                     'text-background-color': '#f8f9fa',
@@ -49,20 +41,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     'text-rotation': 'autorotate'
                 }
             },
-            // ERROR EDGES
             {
                 selector: 'edge[isError="true"]',
                 style: {
                     'line-color': '#dc3545', 
                     'target-arrow-color': '#dc3545',
-                    'color': '#dc3545'
+                    'width': 2
                 }
             }
         ],
         layout: { name: 'preset' }
     });
 
-    // 5. HTML LABEL CONFIGURATION
+    // 4. HTML LABEL CONFIG (The visual cards)
     if(cy.nodeHtmlLabel) {
         cy.nodeHtmlLabel([{
             query: 'node',
@@ -74,11 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return generateWxCard(data);
             }
         }]);
-    } else {
-        alert("Critical Error: HTML Label Extension missing. Please refresh.");
     }
 
-    // 6. EVENT HANDLERS
+    // 5. Event Handlers
     cy.on('tap', 'node', function(evt){
         const nodeData = evt.target.data();
         document.getElementById('detailsContent').textContent = JSON.stringify(nodeData.raw, null, 2);
@@ -137,6 +126,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnFit.addEventListener('click', () => cy.fit(50));
     document.getElementById('btnPdf').addEventListener('click', () => { cy.fit(20); setTimeout(() => window.print(), 500); });
+
+    // --- GENERATOR: INLINE STYLES FOR RELIABILITY ---
+    function generateWxCard(data) {
+        // Map color class to hex code
+        const colorMap = {
+            'bg-green': '#6cc04a',
+            'bg-purple': '#a066cb',
+            'bg-orange': '#ff9d00',
+            'bg-blue': '#00a0d1',
+            'bg-gray': '#6c757d',
+            'bg-red': '#d63939'
+        };
+        const barColor = colorMap[data.colorClass] || '#6c757d';
+
+        // Build Rows
+        const rowsHtml = data.rows.map(r => `
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #f0f0f0; padding-top: 3px; margin-top: 3px;">
+                <span style="color: #666; margin-right: 6px; font-size: 10px;">${r.k}:</span>
+                <span style="font-family: monospace; color: #222; font-weight: 600; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;" title="${r.v}">${r.v}</span>
+            </div>
+        `).join('');
+
+        // Build Card HTML
+        return `
+            <div style="
+                width: 240px; 
+                min-height: 50px; 
+                background-color: #ffffff; 
+                border-radius: 4px; 
+                box-shadow: 0 2px 5px rgba(0,0,0,0.15); 
+                display: flex; 
+                overflow: hidden; 
+                font-family: sans-serif; 
+                border: 1px solid #dcdcdc;
+                text-align: left;
+            ">
+                <div style="
+                    width: 32px; 
+                    background-color: ${barColor}; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    color: white; 
+                    font-size: 14px;
+                ">
+                    <i class="fa-solid ${data.icon}"></i>
+                </div>
+                
+                <div style="flex-grow: 1; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                    <div style="font-weight: 700; font-size: 11px; color: #222; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${data.title}
+                    </div>
+                    <div style="font-size: 9px; color: #888; margin-bottom: 4px; font-style: italic;">
+                        ${data.subtitle}
+                    </div>
+                    <div>
+                        ${rowsHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
 
     // --- PARSER ---
     function parseWxCCFlow(json) {
@@ -215,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(props.cases) s.dataRows.push({k:'Cases', v: Object.keys(props.cases).length});
             if(props.menuLinks) s.dataRows.push({k:'Opts', v: Object.keys(props.menuLinks).length});
         }
-        else if(type === 'play-message' || type === 'queue-contact' || type === 'feedback' || type === 'Feedback-V2') {
+        else if(type === 'play-message' || type === 'queue-contact' || type.includes('feedback')) {
             s.icon = 'fa-volume-high'; s.bgClass = 'bg-blue'; s.subtitle = 'Action';
             if(type.includes('feedback')) { s.icon = 'fa-comment-dots'; s.subtitle = 'Survey'; }
             if(type.includes('queue')) { s.icon = 'fa-users'; s.subtitle = 'Queue'; }
@@ -229,62 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return s;
     }
 
-    // --- HTML GENERATOR ---
-    function generateWxCard(data) {
-        const rowsHtml = data.rows.map(r => 
-            `<div class="wx-data-row"><span class="wx-key">${r.k}:</span><span class="wx-val" title="${r.v}">${r.v}</span></div>`
-        ).join('');
-
-        return `
-            <div class="wx-card">
-                <div class="wx-icon-col ${data.colorClass}">
-                    <i class="fa-solid ${data.icon}"></i>
-                </div>
-                <div class="wx-content-col">
-                    <div class="wx-title" title="${data.title}">${data.title}</div>
-                    <div class="wx-subtitle">${data.subtitle}</div>
-                    <div class="wx-body">${rowsHtml}</div>
-                </div>
-            </div>
-        `;
-    }
-
-    // --- FAIL-SAFE: INJECT CSS FROM JS ---
-    // This ensures styles load even if styles.css fails
-    function injectCriticalStyles() {
-        const style = document.createElement('style');
-        style.innerHTML = `
-            .wx-card { width: 240px; min-height: 50px; background: white; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; overflow: hidden; font-family: sans-serif; border: 1px solid #dcdcdc; }
-            .wx-icon-col { width: 32px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; }
-            .wx-content-col { flex-grow: 1; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-            .wx-title { font-weight: 700; font-size: 11px; color: #222; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .wx-subtitle { font-size: 9px; color: #888; margin-bottom: 4px; font-style: italic; }
-            .wx-data-row { display: flex; justify-content: space-between; font-size: 10px; color: #444; border-top: 1px solid #f0f0f0; padding-top: 3px; margin-top: 3px; }
-            .wx-key { color: #666; margin-right: 6px; }
-            .wx-val { font-family: monospace; color: #222; font-weight: 600; }
-            
-            /* COLORS */
-            .bg-green { background: #6cc04a; }
-            .bg-purple { background: #a066cb; }
-            .bg-orange { background: #ff9d00; }
-            .bg-blue { background: #00a0d1; }
-            .bg-gray { background: #6c757d; }
-        `;
-        document.head.appendChild(style);
-    }
-
     function displayVersions() {
-        const htmlVer = document.querySelector('meta[name="app-version-html"]')?.content || "Unknown";
-        const cssVer = getComputedStyle(document.documentElement).getPropertyValue('--css-version').replace(/['"]/g, '').trim() || "Unknown";
-        
         const div = document.createElement('div');
         div.className = 'version-tag';
-        div.innerHTML = `
-            <strong>Status</strong><br>
-            HTML: <span style="${htmlVer === JS_VERSION ? 'color:green' : 'color:red'}">${htmlVer}</span><br>
-            JS: <span style="color:green">${JS_VERSION}</span><br>
-            CSS: <span style="${cssVer === JS_VERSION ? 'color:green' : 'color:red'}">${cssVer}</span>
-        `;
+        div.innerHTML = `JS: <span style="color:green">${JS_VERSION}</span>`;
         document.body.appendChild(div);
     }
 });
