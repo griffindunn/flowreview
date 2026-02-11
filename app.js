@@ -1,64 +1,68 @@
-// JS Version Indicator
-const JS_VERSION = "v1.7";
+const JS_VERSION = "v2.0";
 
 document.addEventListener('DOMContentLoaded', () => {
-
-    // --- 0. DISPLAY VERSION DEBUGGER ---
     displayVersions();
 
-    // --- 1. REGISTER DAGRE EXTENSION ---
+    // Register extensions
     try {
-        if (typeof cytoscapeDagre !== 'undefined') {
-            cytoscape.use(cytoscapeDagre);
-        } else {
-            console.warn("cytoscape-dagre library not found! The layout might fail.");
-        }
-    } catch (e) {
-        console.error("Failed to register dagre extension:", e);
-    }
-    // -------------------------------------
+        if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre);
+    } catch (e) { console.warn(e); }
 
     let cy = cytoscape({
         container: document.getElementById('cy'),
+        boxSelectionEnabled: false,
+        autounselectify: true,
         style: [
+            // --- NODE STYLE (Card Look) ---
             {
                 selector: 'node',
                 style: {
-                    'background-color': '#0d6efd',
+                    'shape': 'round-rectangle',
+                    'width': 220,
+                    'height': 80,
+                    'background-color': '#ffffff',
+                    'border-width': 1,
+                    'border-color': '#b0b0b0',
+                    'border-opacity': 1,
                     'label': 'data(label)',
-                    'color': '#fff',
+                    'color': '#333333',
+                    'font-size': '10px',
+                    'font-family': 'Helvetica, Arial, sans-serif',
                     'text-valign': 'center',
                     'text-halign': 'center',
-                    'shape': 'round-rectangle',
-                    'width': 'label',
-                    'padding': '12px',
-                    'font-size': '11px',
                     'text-wrap': 'wrap',
-                    'text-max-width': '120px'
+                    'text-max-width': 200,
+                    'text-justification': 'left',
+                    'shadow-blur': 4,
+                    'shadow-color': '#000',
+                    'shadow-opacity': 0.1,
+                    'shadow-offset-y': 2
                 }
             },
-            {
-                selector: 'node[type="start"]',
-                style: { 'background-color': '#198754', 'shape': 'ellipse' }
-            },
-            {
-                selector: 'node[type="disconnect-contact"]',
-                style: { 'background-color': '#dc3545' }
-            },
+            // Color headers based on Type
+            { selector: 'node[type="start"]', style: { 'border-left-width': 6, 'border-left-color': '#28a745' } }, // Green
+            { selector: 'node[type="disconnect-contact"]', style: { 'border-left-width': 6, 'border-left-color': '#dc3545' } }, // Red
+            { selector: 'node[type="play-message"]', style: { 'border-left-width': 6, 'border-left-color': '#007bff' } }, // Blue
+            { selector: 'node[type="ivr-menu"]', style: { 'border-left-width': 6, 'border-left-color': '#fd7e14' } }, // Orange
+            { selector: 'node[type="set-variable"]', style: { 'border-left-width': 6, 'border-left-color': '#6f42c1' } }, // Purple
+            { selector: 'node[type="action"]', style: { 'border-left-width': 6, 'border-left-color': '#17a2b8' } }, // Teal
+
+            // --- EDGE STYLE (Connectors) ---
             {
                 selector: 'edge',
                 style: {
-                    'width': 1.5,
-                    'line-color': '#adb5bd',
-                    'target-arrow-color': '#adb5bd',
+                    'width': 2,
+                    'curve-style': 'bezier', // Smooth curves
+                    'line-color': '#a0a0a0',
+                    'target-arrow-color': '#a0a0a0',
                     'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
+                    'arrow-scale': 1.2,
                     'label': 'data(label)',
                     'font-size': '9px',
-                    'text-background-color': '#ffffff',
+                    'text-background-color': '#f4f4f4',
                     'text-background-opacity': 1,
-                    'text-background-padding': '2px',
-                    'text-rotation': 'autorotate'
+                    'text-background-padding': 3,
+                    'color': '#555'
                 }
             }
         ],
@@ -67,123 +71,119 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fileInput = document.getElementById('fileInput');
     const btnProcess = document.getElementById('btnProcess');
-    const flowInfo = document.getElementById('flowInfo');
-    const flowNameDisplay = document.getElementById('flowName');
-    const errorMsg = document.getElementById('errorMsg');
+    const btnFit = document.getElementById('btnFit');
     const loadingOverlay = document.getElementById('loadingOverlay');
-
     let selectedFile = null;
 
-    fileInput.addEventListener('change', (event) => {
-        if (event.target.files.length > 0) {
-            selectedFile = event.target.files[0];
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            selectedFile = e.target.files[0];
             btnProcess.disabled = false;
-            errorMsg.classList.add('d-none');
-        } else {
-            btnProcess.disabled = true;
         }
     });
 
     btnProcess.addEventListener('click', () => {
         if (!selectedFile) return;
-
         loadingOverlay.classList.remove('d-none');
 
         setTimeout(() => {
             const reader = new FileReader();
-            
             reader.onload = (e) => {
                 try {
                     const json = JSON.parse(e.target.result);
                     const elements = parseFlowBuilderJson(json);
                     
-                    if (elements.length === 0) {
-                        throw new Error("Parsed 0 nodes. Check JSON structure.");
-                    }
+                    if (elements.length === 0) throw new Error("Parsed 0 nodes.");
 
                     cy.elements().remove();
                     cy.add(elements);
 
-                    // Run Layout
+                    // Use 'preset' layout to respect your x/y coordinates
                     cy.layout({ 
-                        name: 'dagre', 
-                        rankDir: 'LR', 
-                        nodeSep: 50, 
-                        rankSep: 100,
-                        animate: false 
+                        name: 'preset',
+                        fit: true,
+                        padding: 50
                     }).run();
 
-                    flowInfo.classList.remove('d-none');
-                    flowNameDisplay.innerText = json.name || selectedFile.name;
-                    errorMsg.classList.add('d-none');
+                    document.getElementById('flowInfo').classList.remove('d-none');
+                    document.getElementById('flowName').innerText = json.name || selectedFile.name;
+                    btnFit.disabled = false;
 
                 } catch (err) {
+                    alert("Error: " + err.message);
                     console.error(err);
-                    errorMsg.innerText = "Error: " + err.message;
-                    errorMsg.classList.remove('d-none');
                 } finally {
                     loadingOverlay.classList.add('d-none');
                 }
             };
-
             reader.readAsText(selectedFile);
-        }, 100);
+        }, 50);
     });
 
+    // Fit Button
+    btnFit.addEventListener('click', () => {
+        cy.fit(50);
+    });
+
+    // Smart PDF Export (Fits graph before print)
     document.getElementById('btnPdf').addEventListener('click', () => {
-        window.print();
+        cy.fit(20); // Fit graph to screen
+        setTimeout(() => {
+            window.print();
+        }, 500);
     });
 
-    // --- HELPER: Display Versions ---
-    function displayVersions() {
-        const htmlVer = document.querySelector('meta[name="app-version-html"]')?.content || "Unknown";
-        
-        // Read CSS variable
-        const cssVerRaw = getComputedStyle(document.documentElement).getPropertyValue('--css-version');
-        const cssVer = cssVerRaw ? cssVerRaw.replace(/['"]/g, '').trim() : "Unknown";
-
-        const div = document.createElement('div');
-        div.className = 'version-tag';
-        div.innerHTML = `
-            <strong>Debug Status</strong><br>
-            HTML: <span style="${htmlVer === JS_VERSION ? 'color:green' : 'color:red'}">${htmlVer}</span><br>
-            JS: <span style="color:green">${JS_VERSION}</span><br>
-            CSS: <span style="${cssVer === JS_VERSION ? 'color:green' : 'color:red'}">${cssVer}</span>
-        `;
-        document.body.appendChild(div);
-    }
-
-    // --- PARSER ---
+    // --- PARSER V2 (With Coordinates & Details) ---
     function parseFlowBuilderJson(json) {
         let nodes = [];
         let edges = [];
 
-        if (!json.process || !json.process.activities || !json.process.links) {
-            return []; 
-        }
+        if (!json.process || !json.process.activities || !json.process.links) return [];
 
         const activities = json.process.activities; 
-        const links = json.process.links;           
+        const links = json.process.links;
+        const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
 
-        // Parse Nodes
+        // 1. Parse Nodes
         Object.values(activities).forEach(act => {
             let nodeLabel = act.name || "Unknown";
             let nodeType = act.activityName || "action";
+            let details = "";
 
-            if (nodeType === 'play-message') nodeLabel = "Play: " + act.name;
-            if (nodeType === 'ivr-menu') nodeLabel = "Menu: " + act.name;
-            if (nodeType === 'set-variable') nodeLabel = "Set: " + act.name;
+            // Get Details based on type
+            if (nodeType === 'play-message') {
+                // Try to find the message value
+                if(act.properties && act.properties.prompts) {
+                    details = "\nPlay: " + (act.properties.prompts[0]?.value || "Audio File");
+                }
+            } else if (nodeType === 'set-variable') {
+                 if(act.properties && act.properties.updates) {
+                     details = "\nSet: " + Object.keys(act.properties.updates).join(", ");
+                 }
+            } else if (nodeType === 'ivr-menu') {
+                if(act.properties && act.properties.links) {
+                     details = "\nOptions: " + Object.keys(act.properties.links).join(", ");
+                }
+            }
+
+            // Get Coordinate (x,y) from the 'diagram' block
+            let posX = 0, posY = 0;
+            if (widgets[act.id] && widgets[act.id].point) {
+                posX = widgets[act.id].point.x;
+                posY = widgets[act.id].point.y;
+            }
 
             nodes.push({
                 data: { 
                     id: act.id, 
-                    label: nodeLabel,
+                    label: `${nodeLabel}${details}`, // Name + Details
                     type: nodeType 
-                }
+                },
+                position: { x: posX, y: posY } // Manual Layout
             });
         });
 
-        // Parse Edges
+        // 2. Parse Edges
         links.forEach(link => {
             let edgeLabel = link.conditionExpr || "";
             if (!edgeLabel && link.properties && link.properties.value) {
@@ -202,5 +202,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         return [...nodes, ...edges];
+    }
+
+    function displayVersions() {
+        const div = document.createElement('div');
+        div.className = 'version-tag';
+        div.innerHTML = `JS: <span style="color:green">${JS_VERSION}</span>`;
+        document.body.appendChild(div);
     }
 });
