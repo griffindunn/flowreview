@@ -1,4 +1,4 @@
-const JS_VERSION = "v4.0";
+const JS_VERSION = "v5.0";
 
 document.addEventListener('DOMContentLoaded', () => {
     displayVersions();
@@ -14,33 +14,30 @@ document.addEventListener('DOMContentLoaded', () => {
         boxSelectionEnabled: false,
         autounselectify: true,
         style: [
-            // GHOST NODE (The HTML overlay sits on top of this)
+            // GHOST NODE: Invisible background, HTML sits on top
             {
                 selector: 'node',
                 style: {
-                    'width': 220,
-                    'height': 60, // approximate height
-                    'background-opacity': 0, // Invisible
+                    'width': 240, 
+                    'height': 70, 
+                    'background-opacity': 0, // Make Cytoscape node invisible
                     'border-width': 0
                 }
             },
-            // EDGES - Trying to mimic the horizontal "flow"
+            // EDGES
             {
                 selector: 'edge',
                 style: {
                     'width': 1.5,
-                    'curve-style': 'bezier', // Or 'taxi' for right-angles
+                    'curve-style': 'bezier',
                     'line-color': '#999',
                     'target-arrow-color': '#999',
                     'target-arrow-shape': 'triangle',
                     'arrow-scale': 1,
-                    'source-distance-from-node': 2,
-                    'target-distance-from-node': 2,
-                    // Label styling
                     'label': 'data(label)',
                     'font-size': '9px',
                     'color': '#555',
-                    'text-background-color': '#f8f9fa',
+                    'text-background-color': '#f0f0f0',
                     'text-background-opacity': 1,
                     'text-background-padding': 2,
                     'text-rotation': 'autorotate'
@@ -50,42 +47,43 @@ document.addEventListener('DOMContentLoaded', () => {
             {
                 selector: 'edge[isError="true"]',
                 style: {
-                    'line-color': '#d63939', // WxCC Red
+                    'line-color': '#d63939', 
                     'target-arrow-color': '#d63939',
                     'width': 2
                 }
             }
         ],
-        layout: { name: 'preset' } // CRITICAL: Use 'preset' to respect X/Y from JSON
+        layout: { name: 'preset' } // CRITICAL: 'preset' uses your manual coordinates
     });
 
     // 3. Configure HTML Labels (The visual cards)
-    cy.nodeHtmlLabel([{
-        query: 'node',
-        valign: "center",
-        halign: "center",
-        valignBox: "center",
-        halignBox: "center",
-        tpl: function(data) {
-            return generateWxCard(data);
-        }
-    }]);
+    // This extension is what creates the "Split Card" DOM elements
+    if(cy.nodeHtmlLabel) {
+        cy.nodeHtmlLabel([{
+            query: 'node',
+            valign: "center",
+            halign: "center",
+            valignBox: "center",
+            halignBox: "center",
+            tpl: function(data) {
+                return generateWxCard(data);
+            }
+        }]);
+    } else {
+        console.error("HTML Label Extension not loaded!");
+        alert("Critical Error: HTML Label extension failed to load. Try hard refreshing.");
+    }
 
     // 4. Click Handler (Details Panel)
     cy.on('tap', 'node', function(evt){
         const nodeData = evt.target.data();
         const rawJson = nodeData.raw || {};
-        
-        // Pretty print JSON
         document.getElementById('detailsContent').textContent = JSON.stringify(rawJson, null, 2);
-        
-        // Open Bootstrap Offcanvas
-        const offcanvasEl = document.getElementById('detailsPanel');
-        const bsOffcanvas = new bootstrap.Offcanvas(offcanvasEl);
+        const bsOffcanvas = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
         bsOffcanvas.show();
     });
 
-    // 5. UI Logic (Upload, Fit, Print)
+    // 5. UI Logic
     const fileInput = document.getElementById('fileInput');
     const btnProcess = document.getElementById('btnProcess');
     const btnFit = document.getElementById('btnFit');
@@ -115,11 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     cy.elements().remove();
                     cy.add(elements);
                     
-                    // Run layout (preset uses the manual coordinates)
+                    // Render layout
                     cy.layout({ name: 'preset' }).run();
-                    
-                    // Fit after a brief delay to ensure rendering
-                    setTimeout(() => cy.fit(50), 100);
+                    setTimeout(() => cy.fit(50), 200);
 
                     document.getElementById('flowInfo').classList.remove('d-none');
                     document.getElementById('flowName').innerText = json.name || selectedFile.name;
@@ -147,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ---------------------------------------------------------
-    // CORE PARSER - The Logic Engine
+    // CORE PARSER
     // ---------------------------------------------------------
     function parseWxCCFlow(json) {
         let nodes = [];
@@ -157,7 +153,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const activities = json.process.activities; 
         const links = json.process.links;
-        // WxCC stores coordinates in 'diagram.widgets', keyed by activity ID
         const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
 
         // Parse Nodes
@@ -178,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     subtitle: style.subtitle,
                     icon: style.icon,
                     colorClass: style.bgClass,
-                    rows: style.dataRows, // Specific details like vars or cases
+                    rows: style.dataRows,
                     raw: act
                 },
                 position: { x: posX, y: posY }
@@ -188,11 +183,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Parse Edges
         links.forEach(link => {
             let label = link.conditionExpr || "";
-            // Clean up common labels
             if(label === 'true') label = '';
             if(label === 'false') label = 'Else';
             
-            // Error Detection
             const lowerLabel = label.toLowerCase();
             const isError = lowerLabel.includes('error') || lowerLabel.includes('timeout') || link.type === 'error';
 
@@ -212,81 +205,76 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------------------------------------------------------
-    // STYLE HELPER - Maps WxCC Types to Visuals
+    // STYLE HELPER
     // ---------------------------------------------------------
     function getWxNodeStyle(act) {
         const type = act.activityName;
         const props = act.properties || {};
         
-        let s = { 
-            icon: 'fa-gear', 
-            bgClass: 'bg-gray', 
-            subtitle: type, 
-            dataRows: [] 
-        };
+        let s = { icon: 'fa-gear', bgClass: 'bg-gray', subtitle: type, dataRows: [] };
 
-        // 1. START / EVENT
-        if(type === 'start' || type === 'event' || type === 'NewPhoneContact') {
-            s.icon = 'fa-play';
-            s.bgClass = 'bg-green';
-            s.subtitle = 'Start Flow';
-            if(props.event) s.dataRows.push({k:'Event', v:props.event});
-        }
-        // 2. PARSE / SET VAR (Purple)
-        else if(type === 'set-variable' || type === 'parse-activity') {
-            s.icon = 'fa-code';
-            s.bgClass = 'bg-purple';
-            if(props.updates) {
-                // Show first 2 variables
-                const keys = Object.keys(props.updates);
-                if(keys[0]) s.dataRows.push({k:'Set', v:keys[0]});
-                if(keys[1]) s.dataRows.push({k:'Set', v:keys[1]});
-            }
-        }
-        // 3. CASE / SWITCH (Orange)
-        else if(type === 'case-statement' || type === 'enum-gateway') {
-            s.icon = 'fa-share-nodes';
-            s.bgClass = 'bg-orange';
-            s.subtitle = 'Decision';
-            // List cases
-            if(props.cases) {
-                const caseKeys = Object.keys(props.cases).slice(0,3); // Max 3
-                s.dataRows.push({k:'Cases', v: caseKeys.join(', ')});
-            }
-            if(props.menuLinks) {
-                 const linkKeys = Object.keys(props.menuLinks).slice(0,3);
-                 s.dataRows.push({k:'Opts', v: linkKeys.join(', ')});
-            }
-        }
-        // 4. PLAY / QUEUE (Blue)
-        else if(type === 'play-message' || type === 'queue-contact') {
-            s.icon = 'fa-volume-high';
-            s.bgClass = 'bg-blue';
-            if(type === 'queue-contact') s.icon = 'fa-users';
+        // Mappings based on WxCC logic
+        switch (type) {
+            case 'start':
+            case 'event':
+            case 'NewPhoneContact':
+                s.icon = 'fa-play'; s.bgClass = 'bg-green'; s.subtitle = 'Start Flow';
+                if(props.event) s.dataRows.push({k:'Event', v:props.event});
+                break;
             
-            // Show prompt name if available
-            if(props.prompts && props.prompts[0]) {
-                let prompt = props.prompts[0].value || "Audio";
-                if(prompt.length > 20) prompt = prompt.substring(0,18) + "..";
-                s.dataRows.push({k:'Msg', v: prompt});
-            }
-        }
-        // 5. END (Red)
-        else if(type === 'disconnect-contact') {
-            s.icon = 'fa-phone-slash';
-            s.bgClass = 'bg-gray'; // WxCC often uses gray for end, or red.
-        }
+            case 'disconnect-contact':
+                s.icon = 'fa-phone-slash'; s.bgClass = 'bg-gray'; // Often Gray/Red
+                s.subtitle = 'End Flow';
+                break;
 
+            case 'set-variable':
+            case 'parse-activity':
+                s.icon = 'fa-code'; s.bgClass = 'bg-purple'; s.subtitle = 'Calculation';
+                if(props.updates) {
+                    const keys = Object.keys(props.updates);
+                    if(keys[0]) s.dataRows.push({k:'Set', v:keys[0]});
+                }
+                break;
+
+            case 'ivr-menu':
+            case 'case-statement':
+            case 'enum-gateway':
+            case 'condition-activity':
+                s.icon = 'fa-share-nodes'; s.bgClass = 'bg-orange'; s.subtitle = 'Decision';
+                if(props.cases) s.dataRows.push({k:'Cases', v: Object.keys(props.cases).length});
+                if(props.menuLinks) s.dataRows.push({k:'Opts', v: Object.keys(props.menuLinks).length + " Links"});
+                if(props.expression) s.dataRows.push({k:'Expr', v: props.expression});
+                break;
+
+            case 'play-message':
+                s.icon = 'fa-volume-high'; s.bgClass = 'bg-blue'; s.subtitle = 'Play Audio';
+                if(props.prompts && props.prompts[0]) {
+                    let p = props.prompts[0].value || "Variable";
+                    if(p.length > 20) p = p.substring(0,18) + "..";
+                    s.dataRows.push({k:'Msg', v: p});
+                }
+                break;
+
+            case 'queue-contact':
+                s.icon = 'fa-users'; s.bgClass = 'bg-blue'; s.subtitle = 'Queue';
+                break;
+            
+            case 'feedback':
+            case 'Feedback-V2':
+                s.icon = 'fa-comment-dots'; s.bgClass = 'bg-blue'; s.subtitle = 'Survey';
+                break;
+
+            case 'run-script':
+                s.icon = 'fa-scroll'; s.bgClass = 'bg-purple'; s.subtitle = 'Script';
+                break;
+        }
         return s;
     }
 
-    // ---------------------------------------------------------
-    // HTML GENERATOR - Creates the DOM elements for nodes
-    // ---------------------------------------------------------
+    // HTML Generator
     function generateWxCard(data) {
-        // Build Data Rows HTML
         const rowsHtml = data.rows.map(r => 
-            `<div class="wx-data-row"><span class="wx-key">${r.k}:</span><span class="wx-val">${r.v}</span></div>`
+            `<div class="wx-data-row"><span class="wx-key">${r.k}:</span><span class="wx-val" title="${r.v}">${r.v}</span></div>`
         ).join('');
 
         return `
@@ -306,6 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayVersions() {
-        // Optional debug tag
+        const div = document.createElement('div');
+        div.style.position='fixed'; div.style.bottom='10px'; div.style.left='10px';
+        div.style.fontSize='10px'; div.style.color='#999';
+        div.innerText = `JS: ${JS_VERSION}`;
+        document.body.appendChild(div);
     }
 });
