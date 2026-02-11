@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WxCC Visualizer (React)</title>
+    <title>WxCC Visualizer v11 (React)</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,16 +11,16 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.10.1/dist/style.css" />
 
     <style>
-        body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #f8f9fa; }
+        body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; background: #f8f9fa; font-family: -apple-system, system-ui, sans-serif; }
         
-        /* --- CONTROLS OVERLAY --- */
+        /* UI Controls */
         .controls-panel {
             position: absolute; top: 20px; left: 20px; width: 280px; z-index: 1000;
-            background: rgba(255,255,255,0.95); border: 1px solid #dee2e6;
+            background: rgba(255,255,255,0.98); border: 1px solid #dee2e6;
             border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 15px;
         }
 
-        /* --- THE SPLIT CARD NODE (Our Custom Design) --- */
+        /* --- THE NODE CARD DESIGN --- */
         .wx-node {
             width: 240px;
             background: white;
@@ -29,23 +29,16 @@
             display: flex;
             overflow: hidden;
             border: 1px solid #dcdcdc;
-            font-family: 'Segoe UI', sans-serif;
             transition: all 0.2s;
         }
         
-        /* Selected State (handled by React Flow) */
+        /* React Flow Selection Override */
         .react-flow__node.selected .wx-node {
             border-color: #0076d1;
             box-shadow: 0 0 0 2px rgba(0,118,209,0.3);
         }
 
-        /* Hover State */
-        .wx-node:hover {
-            border-color: #aaa;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-
-        /* Left Icon Strip */
+        /* The Left Colored Strip */
         .wx-icon-col {
             width: 36px;
             display: flex;
@@ -56,103 +49,125 @@
             flex-shrink: 0;
         }
 
-        /* Right Content Area */
+        /* The Right Content */
         .wx-content-col {
             flex-grow: 1;
             padding: 8px 10px;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            min-width: 0; /* Fix truncation */
+            min-width: 0;
         }
 
-        .wx-title { font-weight: 700; font-size: 11px; color: #212529; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .wx-subtitle { font-size: 10px; color: #6c757d; font-style: italic; margin-bottom: 4px; }
+        .wx-title { 
+            font-weight: 700; font-size: 11px; color: #212529; margin-bottom: 2px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+        }
+        .wx-subtitle { 
+            font-size: 10px; color: #6c757d; font-style: italic; margin-bottom: 4px; 
+        }
 
         .wx-row {
             display: flex; justify-content: space-between;
             font-size: 10px; border-top: 1px solid #f0f0f0;
             padding-top: 3px; margin-top: 2px;
         }
-        .wx-key { color: #888; }
-        .wx-val { font-family: monospace; color: #333; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+        .wx-k { color: #888; margin-right: 5px; }
+        .wx-v { font-family: monospace; color: #333; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
 
-        /* Handle Ports (The dots connections attach to) */
+        /* Handle Ports */
         .react-flow__handle { width: 6px; height: 6px; background: #adb5bd; }
         
-        /* --- SIDEBAR --- */
-        .offcanvas-body pre { font-size: 11px; background: #f8f9fa; border: 1px solid #eee; border-radius: 4px; padding: 10px; }
+        /* Error Box */
+        #crash-screen { padding: 40px; color: #721c24; background: #f8d7da; display: none; }
     </style>
-    
+
     <script type="importmap">
-        {
-            "imports": {
-                "react": "https://esm.sh/react@18.2.0",
-                "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-                "reactflow": "https://esm.sh/reactflow@11.10.1",
-                "dagre": "https://esm.sh/dagre@0.8.5"
-            }
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "reactflow": "https://esm.sh/reactflow@11.10.1?external=react,react-dom",
+            "dagre": "https://esm.sh/dagre@0.8.5"
         }
+    }
     </script>
-    
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
+    
+    <div id="crash-screen">
+        <h3>Startup Error</h3>
+        <pre id="crash-msg"></pre>
+    </div>
 
     <script type="text/babel" data-type="module">
         import React, { useState, useCallback, useMemo } from 'react';
         import { createRoot } from 'react-dom/client';
         import ReactFlow, { 
-            Controls, 
-            Background, 
-            applyEdgeChanges, 
-            applyNodeChanges, 
-            Handle, 
-            Position,
-            MiniMap
+            Controls, Background, applyEdgeChanges, applyNodeChanges, 
+            Handle, Position, MiniMap
         } from 'reactflow';
-        import dagre from 'dagre';
 
-        // --- A. CUSTOM NODE COMPONENT ---
-        // This is the template for every node on the screen
+        // --- 1. NODE CONFIGURATION MAP ---
+        // Modify this section to customize icons and colors!
+        const NODE_CONFIG = {
+            // Logic / Flow
+            'start':            { color: '#2fb755', icon: 'fa-play', label: 'Start' },
+            'event':            { color: '#2fb755', icon: 'fa-bolt', label: 'Event' },
+            'disconnect-contact': { color: '#dc3545', icon: 'fa-phone-slash', label: 'Disconnect' },
+            
+            // Actions
+            'play-message':     { color: '#00a0d1', icon: 'fa-volume-high', label: 'Audio' },
+            'queue-contact':    { color: '#00a0d1', icon: 'fa-users', label: 'Queue' },
+            'blind-transfer':   { color: '#00a0d1', icon: 'fa-share', label: 'Transfer' },
+            'feedback':         { color: '#00a0d1', icon: 'fa-comment-dots', label: 'Survey' },
+            
+            // Decisions
+            'ivr-menu':         { color: '#ff9d00', icon: 'fa-list-ol', label: 'Menu' },
+            'case-statement':   { color: '#ff9d00', icon: 'fa-code-branch', label: 'Switch' },
+            'condition-activity':{ color: '#ff9d00', icon: 'fa-question', label: 'If/Else' },
+            
+            // Data
+            'set-variable':     { color: '#9f67cc', icon: 'fa-pen', label: 'Set Var' },
+            'parse-activity':   { color: '#9f67cc', icon: 'fa-code', label: 'Parse' },
+            'run-script':       { color: '#9f67cc', icon: 'fa-scroll', label: 'Script' },
+            
+            // Fallback
+            'default':          { color: '#6c757d', icon: 'fa-gear', label: 'Node' }
+        };
+
+        // --- 2. CUSTOM NODE COMPONENT ---
         const WxNode = ({ data }) => {
             return (
                 <div className="wx-node">
-                    {/* Input Handle */}
                     <Handle type="target" position={Position.Left} />
                     
-                    {/* Left Icon Strip */}
                     <div className="wx-icon-col" style={{ backgroundColor: data.color }}>
                         <i className={`fa-solid ${data.icon}`}></i>
                     </div>
 
-                    {/* Content */}
                     <div className="wx-content-col">
                         <div className="wx-title" title={data.label}>{data.label}</div>
                         <div className="wx-subtitle">{data.subLabel}</div>
                         
-                        {/* Data Rows */}
                         {data.rows && data.rows.map((r, i) => (
                             <div className="wx-row" key={i}>
-                                <span className="wx-key">{r.k}:</span>
-                                <span className="wx-val" title={r.v}>{r.v}</span>
+                                <span className="wx-k">{r.k}:</span>
+                                <span className="wx-v" title={r.v}>{r.v}</span>
                             </div>
                         ))}
                     </div>
 
-                    {/* Output Handle */}
                     <Handle type="source" position={Position.Right} />
                 </div>
             );
         };
 
-        // Define Node Types
-        const nodeTypes = {
-            wxNode: WxNode
-        };
+        const nodeTypes = { wxNode: WxNode };
 
-        // --- B. PARSER & STYLING LOGIC ---
+        // --- 3. PARSER LOGIC ---
         const parseFlow = (json) => {
             const nodes = [];
             const edges = [];
@@ -165,9 +180,24 @@
 
             // Parse Nodes
             Object.values(activities).forEach(act => {
-                const style = getStyle(act);
+                const type = act.activityName || 'default';
+                const config = NODE_CONFIG[type] || NODE_CONFIG['default'];
                 
-                // Get Coordinates
+                // Extract Details based on type
+                const rows = [];
+                const props = act.properties || {};
+
+                // Specific Data Extraction Logic
+                if (props.prompts?.[0]?.value) rows.push({ k: 'Msg', v: props.prompts[0].value });
+                if (props.updates) {
+                    const keys = Object.keys(props.updates);
+                    if(keys[0]) rows.push({ k: 'Set', v: keys[0] });
+                }
+                if (props.menuLinks) rows.push({ k: 'Opts', v: Object.keys(props.menuLinks).length });
+                if (props.cases) rows.push({ k: 'Cases', v: Object.keys(props.cases).length });
+                if (props.event) rows.push({ k: 'Event', v: props.event });
+
+                // Coordinates
                 let x = 0, y = 0;
                 if (widgets[act.id]?.point) {
                     x = widgets[act.id].point.x;
@@ -176,14 +206,14 @@
 
                 nodes.push({
                     id: act.id,
-                    type: 'wxNode', // Use our custom component
+                    type: 'wxNode',
                     position: { x, y },
                     data: { 
                         label: act.name,
-                        subLabel: style.subLabel,
-                        icon: style.icon,
-                        color: style.color,
-                        rows: style.rows,
+                        subLabel: config.label, // Use our friendly name
+                        icon: config.icon,
+                        color: config.color,
+                        rows: rows,
                         raw: act 
                     }
                 });
@@ -192,150 +222,7 @@
             // Parse Edges
             links.forEach(link => {
                 if (link.sourceActivityId && link.targetActivityId) {
-                    // Check for Error paths
-                    const label = link.conditionExpr || "";
-                    const isError = label.toLowerCase().includes('error') || 
-                                  label.toLowerCase().includes('timeout') || 
-                                  link.type === 'error';
-
-                    edges.push({
-                        id: `${link.sourceActivityId}-${link.targetActivityId}`,
-                        source: link.sourceActivityId,
-                        target: link.targetActivityId,
-                        label: label === 'true' ? '' : label,
-                        type: 'smoothstep', // Right-angle lines
-                        style: { 
-                            stroke: isError ? '#dc3545' : '#b1b1b7', 
-                            strokeWidth: 2 
-                        },
-                        labelStyle: { fill: '#666', fontWeight: 500 },
-                        animated: false
-                    });
-                }
-            });
-
-            return { nodes, edges };
-        };
-
-        // --- C. STYLES FOR SPECIFIC NODES (We will customize this!) ---
-        const getStyle = (act) => {
-            const type = act.activityName;
-            const props = act.properties || {};
-            
-            let s = { icon: 'fa-gear', color: '#6c757d', subLabel: type, rows: [] };
-
-            switch (type) {
-                case 'start':
-                case 'event':
-                case 'NewPhoneContact':
-                    s.icon = 'fa-play'; s.color = '#2fb755'; s.subLabel = 'Start Flow';
-                    if(props.event) s.rows.push({k:'Event', v:props.event});
-                    break;
-                case 'disconnect-contact':
-                    s.icon = 'fa-phone-slash'; s.color = '#dc3545'; s.subLabel = 'Disconnect';
-                    break;
-                case 'play-message':
-                    s.icon = 'fa-volume-high'; s.color = '#00a0d1'; s.subLabel = 'Audio';
-                    if(props.prompts?.[0]) s.rows.push({k:'Msg', v: props.prompts[0].value});
-                    break;
-                case 'ivr-menu':
-                case 'case-statement':
-                    s.icon = 'fa-share-nodes'; s.color = '#ff9d00'; s.subLabel = 'Switch';
-                    if(props.menuLinks) s.rows.push({k:'Links', v: Object.keys(props.menuLinks).length});
-                    break;
-                case 'set-variable':
-                case 'parse-activity':
-                    s.icon = 'fa-code'; s.color = '#9f67cc'; s.subLabel = 'Calc';
-                    break;
-                case 'queue-contact':
-                    s.icon = 'fa-users'; s.color = '#00a0d1'; s.subLabel = 'Queue';
-                    break;
-            }
-            return s;
-        };
-
-        // --- D. MAIN APP COMPONENT ---
-        const App = () => {
-            const [nodes, setNodes] = useState([]);
-            const [edges, setEdges] = useState([]);
-            const [selectedNode, setSelectedNode] = useState(null);
-            const [fileName, setFileName] = useState('');
-
-            // React Flow Callbacks
-            const onNodesChange = useCallback(
-                (changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []
-            );
-            const onEdgesChange = useCallback(
-                (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []
-            );
-            const onNodeClick = useCallback((event, node) => {
-                setSelectedNode(node);
-            }, []);
-
-            // File Upload Handler
-            const handleFileUpload = (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-                
-                setFileName(file.name);
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const json = JSON.parse(e.target.result);
-                        const { nodes: newNodes, edges: newEdges } = parseFlow(json);
-                        setNodes(newNodes);
-                        setEdges(newEdges);
-                    } catch (err) {
-                        alert("Error parsing JSON: " + err.message);
-                    }
-                };
-                reader.readAsText(file);
-            };
-
-            return (
-                <>
-                    {/* Controls */}
-                    <div className="controls-panel">
-                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>React Visualizer</h6>
-                        <input type="file" className="form-control form-control-sm mb-3" accept=".json" onChange={handleFileUpload} />
-                        
-                        {fileName && (
-                            <div className="alert alert-light border py-2 px-3 small">
-                                <strong>Active:</strong> {fileName}
-                            </div>
-                        )}
-                        
-                        {selectedNode && (
-                            <div className="mt-3 border-top pt-3">
-                                <h6 className="small fw-bold">Selection Details</h6>
-                                <div className="bg-light border rounded p-2" style={{maxHeight: '300px', overflow: 'auto', fontSize: '10px'}}>
-                                    <pre className="m-0">{JSON.stringify(selectedNode.data.raw, null, 2)}</pre>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Canvas */}
-                    <ReactFlow
-                        nodes={nodes}
-                        edges={edges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onNodeClick={onNodeClick}
-                        nodeTypes={nodeTypes}
-                        fitView
-                    >
-                        <Background color="#aaa" gap={16} />
-                        <Controls />
-                        <MiniMap />
-                    </ReactFlow>
-                </>
-            );
-        };
-
-        // Render
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+                    let label = link.conditionExpr || "";
+                    if(label === 'true') label = '';
+                    
+                    const isError = label.toLowerCase().includes('error') ||
