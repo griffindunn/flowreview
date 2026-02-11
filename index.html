@@ -2,61 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WxCC Flow Visualizer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        body, html { height: 100%; overflow: hidden; }
+        #cy { width: 100%; height: 100%; background-color: #fff; }
+        
+        /* Floating Upload Box */
+        .controls-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 999;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            width: 300px;
+        }
+
+        /* Hide controls when printing/exporting */
+        @media print {
+            .controls-layer { display: none !important; }
+            #cy { height: 100vh; width: 100vw; }
+        }
+    </style>
 </head>
 <body>
 
-<div class="container-fluid vh-100 d-flex flex-column">
-    <div class="row bg-dark text-white p-2 align-items-center">
-        <div class="col">
-            <h5 class="m-0">WxCC Flow Engineer Tool</h5>
+    <div class="controls-layer">
+        <h5 class="mb-3">Flow Visualizer</h5>
+        
+        <div class="mb-3">
+            <label class="form-label small fw-bold">1. Upload Flow JSON</label>
+            <input type="file" id="fileInput" class="form-control form-control-sm" accept=".json">
         </div>
-        <div class="col-auto">
-            <small class="text-white-50">Client-Side Processing Only</small>
-        </div>
-    </div>
 
-    <div class="row flex-grow-1 overflow-hidden">
-        <div class="col-md-3 bg-light border-end d-flex flex-column p-3">
-            
-            <label for="fileInput" class="form-label fw-bold">1. Upload Flow(s)</label>
-            <input type="file" id="fileInput" class="form-control mb-3" accept=".json">
-            
+        <div id="flowInfo" class="d-none">
             <hr>
-
-            <label for="searchInput" class="form-label fw-bold">2. Search & Select</label>
-            <input type="text" id="searchInput" class="form-control mb-2" placeholder="Type to filter..." disabled>
-            
-            <div id="flowList" class="list-group overflow-auto flex-grow-1">
-                <div class="text-center text-muted mt-5">
-                    <small>Upload a JSON file to begin.</small>
-                </div>
-            </div>
+            <strong id="flowName" class="d-block mb-2 text-primary"></strong>
+            <button id="btnPdf" class="btn btn-danger w-100 btn-sm">Download PDF</button>
         </div>
-
-        <div class="col-md-9 p-0 position-relative bg-white">
-            <div id="cy"></div> <div id="placeholderText" class="position-absolute top-50 start-50 translate-middle text-center text-muted">
-                <h4>No Flow Selected</h4>
-                <p>Upload a file and select a flow from the left.</p>
-            </div>
-
-            <div id="actionPanel" class="position-absolute top-0 end-0 m-3 d-none shadow-sm">
-                <div class="card p-2 d-flex flex-row align-items-center gap-2">
-                    <span class="fw-bold" id="currentFlowName">Flow Name</span>
-                    <div class="vr"></div>
-                    <button id="btnDownload" class="btn btn-sm btn-outline-primary">Export JSON</button>
-                </div>
-            </div>
-        </div>
+        
+        <div id="errorMsg" class="alert alert-warning mt-2 d-none small"></div>
     </div>
-</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape-dagre/2.5.0/cytoscape-dagre.min.js"></script>
-<script src="app.js"></script>
+    <div id="cy"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape-dagre/2.5.0/cytoscape-dagre.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
