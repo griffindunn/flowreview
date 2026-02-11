@@ -36,22 +36,45 @@
             pointer-events: none;
         }
 
+        /* Loading Overlay */
+        #loadingOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
         @media print {
-            .controls-layer, .version-tag { display: none !important; }
+            .controls-layer, .version-tag, #loadingOverlay { display: none !important; }
             #cy { height: 100vh; width: 100vw; }
         }
     </style>
 </head>
 <body>
 
-    <div class="version-tag">App Version: v1.3 (FlowBuilder Parser)</div>
+    <div class="version-tag">App Version: v1.4 (Manual Trigger)</div>
+
+    <div id="loadingOverlay" class="d-none">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+        <div class="mt-2 fw-bold text-secondary">Processing Flow Diagram...</div>
+    </div>
 
     <div class="controls-layer">
         <h5 class="mb-3">Flow Visualizer</h5>
         
-        <div class="mb-3">
-            <label class="form-label small fw-bold">1. Upload Flow JSON</label>
+        <div class="mb-2">
+            <label class="form-label small fw-bold">1. Select Flow JSON</label>
             <input type="file" id="fileInput" class="form-control form-control-sm" accept=".json">
+        </div>
+
+        <div class="mb-3">
+            <button id="btnProcess" class="btn btn-primary btn-sm w-100" disabled>
+                2. Visualize Flow
+            </button>
         </div>
 
         <div id="flowInfo" class="d-none">
