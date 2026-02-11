@@ -1,5 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Cytoscape with a preset layout to save resources on load
+    
+    // --- FIX: REGISTER DAGRE EXTENSION ---
+    // This tells Cytoscape to use the Dagre layout library we loaded in index.html
+    try {
+        if (window.cytoscapeDagre) {
+            cytoscape.use(window.cytoscapeDagre);
+        }
+    } catch (e) {
+        console.warn("Dagre registration warning:", e);
+    }
+    // -------------------------------------
+
     let cy = cytoscape({
         container: document.getElementById('cy'),
         style: [
@@ -44,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         ],
-        layout: { name: 'preset' }
+        layout: { name: 'preset' } // Start with no layout
     });
 
     const fileInput = document.getElementById('fileInput');
@@ -60,7 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput.addEventListener('change', (event) => {
         if (event.target.files.length > 0) {
             selectedFile = event.target.files[0];
-            // ENABLE THE BUTTON when file is picked
             btnProcess.disabled = false;
             errorMsg.classList.add('d-none');
         } else {
@@ -91,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     cy.elements().remove();
                     cy.add(elements);
 
-                    // Run Heavy Layout Calculation
+                    // Run the Dagre Layout
                     cy.layout({ 
                         name: 'dagre', 
                         rankDir: 'LR', 
@@ -109,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     errorMsg.innerText = "Error: " + err.message;
                     errorMsg.classList.remove('d-none');
                 } finally {
-                    // Hide spinner
                     loadingOverlay.classList.add('d-none');
                 }
             };
