@@ -2,347 +2,340 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WxCC Flow Visualizer v10.0</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WxCC Visualizer (React)</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.10.1/dist/style.css" />
 
     <style>
-        body, html { height: 100%; width: 100%; overflow: hidden; background-color: #f0f0f0; margin: 0; }
-        #cy { width: 100%; height: 100%; display: block; }
-
-        .controls-layer {
-            position: absolute; top: 20px; left: 20px; width: 280px; z-index: 100;
-            background: rgba(255, 255, 255, 0.98); border: 1px solid #ccc;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 6px; padding: 15px;
+        body, html, #root { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #f8f9fa; }
+        
+        /* --- CONTROLS OVERLAY --- */
+        .controls-panel {
+            position: absolute; top: 20px; left: 20px; width: 280px; z-index: 1000;
+            background: rgba(255,255,255,0.95); border: 1px solid #dee2e6;
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 15px;
         }
 
-        #loadingOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.95); z-index: 2000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        /* --- THE SPLIT CARD NODE (Our Custom Design) --- */
+        .wx-node {
+            width: 240px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            overflow: hidden;
+            border: 1px solid #dcdcdc;
+            font-family: 'Segoe UI', sans-serif;
+            transition: all 0.2s;
         }
+        
+        /* Selected State (handled by React Flow) */
+        .react-flow__node.selected .wx-node {
+            border-color: #0076d1;
+            box-shadow: 0 0 0 2px rgba(0,118,209,0.3);
+        }
+
+        /* Hover State */
+        .wx-node:hover {
+            border-color: #aaa;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        /* Left Icon Strip */
+        .wx-icon-col {
+            width: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        /* Right Content Area */
+        .wx-content-col {
+            flex-grow: 1;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0; /* Fix truncation */
+        }
+
+        .wx-title { font-weight: 700; font-size: 11px; color: #212529; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wx-subtitle { font-size: 10px; color: #6c757d; font-style: italic; margin-bottom: 4px; }
+
+        .wx-row {
+            display: flex; justify-content: space-between;
+            font-size: 10px; border-top: 1px solid #f0f0f0;
+            padding-top: 3px; margin-top: 2px;
+        }
+        .wx-key { color: #888; }
+        .wx-val { font-family: monospace; color: #333; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+
+        /* Handle Ports (The dots connections attach to) */
+        .react-flow__handle { width: 6px; height: 6px; background: #adb5bd; }
+        
+        /* --- SIDEBAR --- */
+        .offcanvas-body pre { font-size: 11px; background: #f8f9fa; border: 1px solid #eee; border-radius: 4px; padding: 10px; }
     </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "react": "https://esm.sh/react@18.2.0",
+                "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+                "reactflow": "https://esm.sh/reactflow@11.10.1",
+                "dagre": "https://esm.sh/dagre@0.8.5"
+            }
+        }
+    </script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
+    <div id="root"></div>
 
-    <div id="loadingOverlay" class="d-none">
-        <div class="spinner-border text-primary" role="status"></div>
-        <div class="mt-2 small fw-bold text-secondary">Generating High-Fidelity Nodes...</div>
-    </div>
+    <script type="text/babel" data-type="module">
+        import React, { useState, useCallback, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import ReactFlow, { 
+            Controls, 
+            Background, 
+            applyEdgeChanges, 
+            applyNodeChanges, 
+            Handle, 
+            Position,
+            MiniMap
+        } from 'reactflow';
+        import dagre from 'dagre';
 
-    <div class="controls-layer">
-        <h6 class="fw-bold mb-3">Flow Visualizer v10</h6>
-        <input type="file" id="fileInput" class="form-control form-control-sm mb-3" accept=".json">
-        
-        <div class="d-flex gap-2 mb-2">
-            <button id="btnProcess" class="btn btn-primary btn-sm flex-grow-1" disabled>Visualize</button>
-            <button id="btnFit" class="btn btn-outline-secondary btn-sm" disabled>Fit</button>
-        </div>
-        
-        <div id="flowInfo" class="d-none border-top pt-2 mt-2">
-            <div id="flowName" class="text-truncate fw-bold small mb-2"></div>
-            <button id="btnPdf" class="btn btn-danger w-100 btn-sm">Export PDF</button>
-        </div>
-        <div id="errorMsg" class="alert alert-danger mt-2 d-none py-1 px-2 small"></div>
-    </div>
+        // --- A. CUSTOM NODE COMPONENT ---
+        // This is the template for every node on the screen
+        const WxNode = ({ data }) => {
+            return (
+                <div className="wx-node">
+                    {/* Input Handle */}
+                    <Handle type="target" position={Position.Left} />
+                    
+                    {/* Left Icon Strip */}
+                    <div className="wx-icon-col" style={{ backgroundColor: data.color }}>
+                        <i className={`fa-solid ${data.icon}`}></i>
+                    </div>
 
-    <div id="cy"></div>
+                    {/* Content */}
+                    <div className="wx-content-col">
+                        <div className="wx-title" title={data.label}>{data.label}</div>
+                        <div className="wx-subtitle">{data.subLabel}</div>
+                        
+                        {/* Data Rows */}
+                        {data.rows && data.rows.map((r, i) => (
+                            <div className="wx-row" key={i}>
+                                <span className="wx-key">{r.k}:</span>
+                                <span className="wx-val" title={r.v}>{r.v}</span>
+                            </div>
+                        ))}
+                    </div>
 
-    <div class="offcanvas offcanvas-end shadow" tabindex="-1" id="detailsPanel" data-bs-backdrop="false">
-        <div class="offcanvas-header border-bottom bg-light py-2">
-            <h6 class="offcanvas-title m-0">Node Config</h6>
-            <button type="button" class="btn-close btn-sm" data-bs-dismiss="offcanvas"></button>
-        </div>
-        <div class="offcanvas-body bg-light p-0">
-            <div class="p-3">
-                <pre id="detailsContent" class="bg-white border rounded p-3 small mb-0 shadow-sm" style="font-size: 11px; white-space: pre-wrap;"></pre>
-            </div>
-        </div>
-    </div>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        
-        try { if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre); } catch(e){}
-
-        // --- ICON PATHS (Embedded SVG Data) ---
-        // We use paths directly so we don't rely on fonts loading
-        const ICONS = {
-            play: "M8 5v14l11-7z", // Triangle
-            stop: "M6 6h12v12H6z", // Square
-            gear: "M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z",
-            branch: "M19,3H5C3.89,3,3,3.9,3,5v14c0,1.1,0.89,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.11,3,19,3z M17,17h-2v-4l-4-3l-4,3v4H5v-5 l6-4.5L17,12V17z",
-            user: "M12,12c2.21,0,4-1.79,4-4s-1.79-4-4-4S8,5.79,8,8S9.79,12,12,12z M12,14c-2.67,0-8,1.34-8,4v2h16v-2C20,15.34,14.67,14,12,14z",
-            message: "M20,2H4C2.9,2,2,2.9,2,4v18l4-4h14c1.1,0,2-0.9,2-2V4C22,2.9,21.1,2,20,2z"
+                    {/* Output Handle */}
+                    <Handle type="source" position={Position.Right} />
+                </div>
+            );
         };
 
-        // 2. Init Cytoscape
-        let cy = cytoscape({
-            container: document.getElementById('cy'),
-            boxSelectionEnabled: false,
-            style: [
-                {
-                    selector: 'node',
-                    style: {
-                        'shape': 'rectangle',
-                        'width': 240,
-                        'height': 70,
-                        'background-color': 'transparent', 
-                        'background-image': 'data(svg)',   // Load SVG string as image
-                        'background-fit': 'contain',
-                        'border-width': 0
-                    }
-                },
-                {
-                    selector: 'edge',
-                    style: {
-                        'width': 2,
-                        'curve-style': 'bezier',
-                        'line-color': '#a0a0a0',
-                        'target-arrow-color': '#a0a0a0',
-                        'target-arrow-shape': 'triangle',
-                        'font-size': '10px',
-                        'color': '#444',
-                        'text-background-color': '#fff',
-                        'text-background-opacity': 0.9,
-                        'label': 'data(label)',
-                        'text-rotation': 'autorotate'
-                    }
-                },
-                {
-                    selector: 'edge[isError="true"]',
-                    style: { 'line-color': '#dc3545', 'target-arrow-color': '#dc3545', 'color': '#dc3545' }
-                }
-            ],
-            layout: { name: 'preset' }
-        });
+        // Define Node Types
+        const nodeTypes = {
+            wxNode: WxNode
+        };
 
-        // 3. Logic
-        const fileInput = document.getElementById('fileInput');
-        const btnProcess = document.getElementById('btnProcess');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        let selectedFile = null;
-
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                selectedFile = e.target.files[0];
-                btnProcess.disabled = false;
-            }
-        });
-
-        btnProcess.addEventListener('click', () => {
-            if (!selectedFile) return;
-            loadingOverlay.classList.remove('d-none');
-
-            setTimeout(() => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const json = JSON.parse(e.target.result);
-                        const elements = parseWxCCFlow(json);
-                        
-                        cy.elements().remove();
-                        cy.add(elements);
-                        
-                        cy.layout({ name: 'preset' }).run();
-                        setTimeout(() => cy.fit(50), 200);
-
-                        document.getElementById('flowInfo').classList.remove('d-none');
-                        document.getElementById('flowName').innerText = json.name || selectedFile.name;
-                        document.getElementById('btnFit').disabled = false;
-                        document.getElementById('errorMsg').classList.add('d-none');
-
-                    } catch (err) {
-                        console.error(err);
-                        const el = document.getElementById('errorMsg');
-                        el.innerText = "Error: " + err.message;
-                        el.classList.remove('d-none');
-                    } finally {
-                        loadingOverlay.classList.add('d-none');
-                    }
-                };
-                reader.readAsText(selectedFile);
-            }, 100);
-        });
-
-        document.getElementById('btnFit').addEventListener('click', () => cy.fit(50));
-        document.getElementById('btnPdf').addEventListener('click', () => { cy.fit(20); setTimeout(() => window.print(), 500); });
-
-        cy.on('tap', 'node', (evt) => {
-            const nodeData = evt.target.data();
-            document.getElementById('detailsContent').textContent = JSON.stringify(nodeData.raw, null, 2);
-            new bootstrap.Offcanvas(document.getElementById('detailsPanel')).show();
-        });
-
-        // --- SVG GENERATOR (The "Split Card" Engine) ---
-        function createNodeSVG(data) {
-            const width = 240;
-            const height = 70;
-            const barWidth = 36;
+        // --- B. PARSER & STYLING LOGIC ---
+        const parseFlow = (json) => {
+            const nodes = [];
+            const edges = [];
             
-            const colors = {
-                'bg-green': '#2fb755',
-                'bg-purple': '#9f67cc',
-                'bg-orange': '#ff9d00',
-                'bg-blue':   '#00a0d1',
-                'bg-gray':   '#6c757d',
-                'bg-red':    '#d63939'
-            };
-            const barColor = colors[data.colorClass] || '#666';
-            const iconPath = ICONS[data.icon] || ICONS.gear;
+            if (!json.process?.activities || !json.process?.links) return { nodes, edges };
 
-            const safeTitle = (data.title || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            const safeSub = (data.subtitle || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-            let rowsSvg = "";
-            let yPos = 45;
-            if (data.rows && data.rows.length > 0) {
-                data.rows.slice(0, 2).forEach(row => {
-                    const k = (row.k + ":").replace(/&/g, "&amp;");
-                    const v = (row.v || "").replace(/&/g, "&amp;");
-                    rowsSvg += `
-                        <text x="${barWidth + 10}" y="${yPos}" font-family="Arial, sans-serif" font-size="10" fill="#666">${k}</text>
-                        <text x="${width - 10}" y="${yPos}" font-family="Consolas, monospace" font-size="10" fill="#222" text-anchor="end" font-weight="bold">${v}</text>
-                    `;
-                    yPos += 14;
-                });
-            }
-
-            const svgString = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-                    <defs>
-                        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-                            <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.2"/>
-                        </filter>
-                    </defs>
-                    <rect x="2" y="2" width="${width-4}" height="${height-4}" rx="4" ry="4" fill="white" stroke="#ccc" stroke-width="1" filter="url(#shadow)" />
-                    <path d="M 2 2 L ${barWidth} 2 L ${barWidth} ${height-2} L 2 ${height-2} Q 2 ${height-2} 2 ${height-6} L 2 6 Q 2 2 6 2 Z" fill="${barColor}" />
-                    <g transform="translate(6, 23) scale(1)">
-                        <path d="${iconPath}" fill="white"/>
-                    </g>
-                    <text x="${barWidth + 10}" y="20" font-family="Segoe UI, Arial, sans-serif" font-weight="bold" font-size="11" fill="#333">${safeTitle}</text>
-                    <text x="${barWidth + 10}" y="32" font-family="Segoe UI, Arial, sans-serif" font-style="italic" font-size="9" fill="#888">${safeSub}</text>
-                    <line x1="${barWidth}" y1="36" x2="${width}" y2="36" stroke="#f0f0f0" stroke-width="1" />
-                    ${rowsSvg}
-                </svg>
-            `;
-
-            return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
-        }
-
-        // --- PARSER ---
-        function parseWxCCFlow(json) {
-            let nodes = [];
-            let edges = [];
-
-            if (!json.process || !json.process.activities || !json.process.links) return [];
-
-            const activities = json.process.activities; 
+            const activities = json.process.activities;
             const links = json.process.links;
-            const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
+            const widgets = json.diagram?.widgets || {};
 
+            // Parse Nodes
             Object.values(activities).forEach(act => {
-                const style = getWxNodeStyle(act);
-                let displayTitle = act.name || "Unknown";
-                if(displayTitle.length > 25) displayTitle = displayTitle.substring(0, 23) + "..";
-
-                const svgData = createNodeSVG({
-                    title: displayTitle,
-                    subtitle: style.subtitle,
-                    colorClass: style.bgClass,
-                    icon: style.icon,
-                    rows: style.dataRows
-                });
-
-                let posX = widgets[act.id]?.point?.x || 0;
-                let posY = widgets[act.id]?.point?.y || 0;
+                const style = getStyle(act);
+                
+                // Get Coordinates
+                let x = 0, y = 0;
+                if (widgets[act.id]?.point) {
+                    x = widgets[act.id].point.x;
+                    y = widgets[act.id].point.y;
+                }
 
                 nodes.push({
-                    data: { id: act.id, svg: svgData, raw: act },
-                    position: { x: posX, y: posY }
+                    id: act.id,
+                    type: 'wxNode', // Use our custom component
+                    position: { x, y },
+                    data: { 
+                        label: act.name,
+                        subLabel: style.subLabel,
+                        icon: style.icon,
+                        color: style.color,
+                        rows: style.rows,
+                        raw: act 
+                    }
                 });
             });
 
+            // Parse Edges
             links.forEach(link => {
-                let label = link.conditionExpr || "";
-                if(label === 'true') label = '';
-                if(label === 'false') label = 'Else';
-                const isError = label.toLowerCase().includes('error') || label.toLowerCase().includes('timeout') || link.type === 'error';
-
                 if (link.sourceActivityId && link.targetActivityId) {
+                    // Check for Error paths
+                    const label = link.conditionExpr || "";
+                    const isError = label.toLowerCase().includes('error') || 
+                                  label.toLowerCase().includes('timeout') || 
+                                  link.type === 'error';
+
                     edges.push({
-                        data: {
-                            source: link.sourceActivityId, target: link.targetActivityId,
-                            label: label, isError: isError.toString()
-                        }
+                        id: `${link.sourceActivityId}-${link.targetActivityId}`,
+                        source: link.sourceActivityId,
+                        target: link.targetActivityId,
+                        label: label === 'true' ? '' : label,
+                        type: 'smoothstep', // Right-angle lines
+                        style: { 
+                            stroke: isError ? '#dc3545' : '#b1b1b7', 
+                            strokeWidth: 2 
+                        },
+                        labelStyle: { fill: '#666', fontWeight: 500 },
+                        animated: false
                     });
                 }
             });
-            return [...nodes, ...edges];
-        }
 
-        // --- STYLE MAPPER ---
-        function getWxNodeStyle(act) {
+            return { nodes, edges };
+        };
+
+        // --- C. STYLES FOR SPECIFIC NODES (We will customize this!) ---
+        const getStyle = (act) => {
             const type = act.activityName;
             const props = act.properties || {};
-            let s = { bgClass: 'bg-gray', subtitle: type, icon: 'gear', dataRows: [] };
+            
+            let s = { icon: 'fa-gear', color: '#6c757d', subLabel: type, rows: [] };
 
             switch (type) {
                 case 'start':
                 case 'event':
                 case 'NewPhoneContact':
-                    s.bgClass = 'bg-green'; s.subtitle = 'Start Flow'; s.icon = 'play';
-                    if(props.event) s.dataRows.push({k:'Event', v:props.event});
+                    s.icon = 'fa-play'; s.color = '#2fb755'; s.subLabel = 'Start Flow';
+                    if(props.event) s.rows.push({k:'Event', v:props.event});
                     break;
                 case 'disconnect-contact':
-                    s.bgClass = 'bg-gray'; s.subtitle = 'End Flow'; s.icon = 'stop';
+                    s.icon = 'fa-phone-slash'; s.color = '#dc3545'; s.subLabel = 'Disconnect';
                     break;
-                case 'set-variable':
-                case 'parse-activity':
-                    s.bgClass = 'bg-purple'; s.subtitle = 'Calculation'; s.icon = 'gear';
-                    if(props.updates) {
-                        const keys = Object.keys(props.updates);
-                        if(keys[0]) s.dataRows.push({k:'Set', v:keys[0]});
-                    }
+                case 'play-message':
+                    s.icon = 'fa-volume-high'; s.color = '#00a0d1'; s.subLabel = 'Audio';
+                    if(props.prompts?.[0]) s.rows.push({k:'Msg', v: props.prompts[0].value});
                     break;
                 case 'ivr-menu':
                 case 'case-statement':
-                case 'enum-gateway':
-                case 'condition-activity':
-                    s.bgClass = 'bg-orange'; s.subtitle = 'Decision'; s.icon = 'branch';
-                    if(props.cases) s.dataRows.push({k:'Cases', v: Object.keys(props.cases).length});
-                    if(props.menuLinks) s.dataRows.push({k:'Opts', v: Object.keys(props.menuLinks).length + " Links"});
-                    if(props.expression) {
-                        let expr = props.expression;
-                        if(expr.length > 15) expr = expr.substring(0,15) + "..";
-                        s.dataRows.push({k:'Expr', v: expr});
-                    }
+                    s.icon = 'fa-share-nodes'; s.color = '#ff9d00'; s.subLabel = 'Switch';
+                    if(props.menuLinks) s.rows.push({k:'Links', v: Object.keys(props.menuLinks).length});
                     break;
-                case 'play-message':
+                case 'set-variable':
+                case 'parse-activity':
+                    s.icon = 'fa-code'; s.color = '#9f67cc'; s.subLabel = 'Calc';
+                    break;
                 case 'queue-contact':
-                case 'feedback':
-                case 'Feedback-V2':
-                    s.bgClass = 'bg-blue'; s.subtitle = 'Action'; s.icon = 'message';
-                    if(type.includes('feedback')) { s.subtitle = 'Survey'; s.icon = 'message'; }
-                    if(type.includes('queue')) { s.subtitle = 'Queue'; s.icon = 'user'; }
-                    if(props.prompts && props.prompts[0]) {
-                        let p = props.prompts[0].value || "Var";
-                        if(p.length > 18) p = p.substring(0,16) + "..";
-                        s.dataRows.push({k:'Msg', v: p});
-                    }
-                    break;
-                case 'run-script':
-                    s.bgClass = 'bg-purple'; s.subtitle = 'Script'; s.icon = 'gear';
+                    s.icon = 'fa-users'; s.color = '#00a0d1'; s.subLabel = 'Queue';
                     break;
             }
             return s;
-        }
-    });
+        };
+
+        // --- D. MAIN APP COMPONENT ---
+        const App = () => {
+            const [nodes, setNodes] = useState([]);
+            const [edges, setEdges] = useState([]);
+            const [selectedNode, setSelectedNode] = useState(null);
+            const [fileName, setFileName] = useState('');
+
+            // React Flow Callbacks
+            const onNodesChange = useCallback(
+                (changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []
+            );
+            const onEdgesChange = useCallback(
+                (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []
+            );
+            const onNodeClick = useCallback((event, node) => {
+                setSelectedNode(node);
+            }, []);
+
+            // File Upload Handler
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                setFileName(file.name);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        const { nodes: newNodes, edges: newEdges } = parseFlow(json);
+                        setNodes(newNodes);
+                        setEdges(newEdges);
+                    } catch (err) {
+                        alert("Error parsing JSON: " + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            return (
+                <>
+                    {/* Controls */}
+                    <div className="controls-panel">
+                        <h6 className="fw-bold mb-3"><i className="fa-solid fa-bolt me-2"></i>React Visualizer</h6>
+                        <input type="file" className="form-control form-control-sm mb-3" accept=".json" onChange={handleFileUpload} />
+                        
+                        {fileName && (
+                            <div className="alert alert-light border py-2 px-3 small">
+                                <strong>Active:</strong> {fileName}
+                            </div>
+                        )}
+                        
+                        {selectedNode && (
+                            <div className="mt-3 border-top pt-3">
+                                <h6 className="small fw-bold">Selection Details</h6>
+                                <div className="bg-light border rounded p-2" style={{maxHeight: '300px', overflow: 'auto', fontSize: '10px'}}>
+                                    <pre className="m-0">{JSON.stringify(selectedNode.data.raw, null, 2)}</pre>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Canvas */}
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onNodeClick={onNodeClick}
+                        nodeTypes={nodeTypes}
+                        fitView
+                    >
+                        <Background color="#aaa" gap={16} />
+                        <Controls />
+                        <MiniMap />
+                    </ReactFlow>
+                </>
+            );
+        };
+
+        // Render
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
