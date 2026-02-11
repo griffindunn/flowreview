@@ -1,56 +1,65 @@
-const JS_VERSION = "v3.0";
+const JS_VERSION = "v4.0";
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Bootstrap Modal Instance
-    const detailsPanel = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
-    const detailsContent = document.getElementById('detailsContent');
+    displayVersions();
 
-    // Init Cytoscape
+    // 1. Extensions
+    try {
+        if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre);
+    } catch (e) { console.warn(e); }
+
+    // 2. Cytoscape Config
     let cy = cytoscape({
         container: document.getElementById('cy'),
         boxSelectionEnabled: false,
         autounselectify: true,
         style: [
-            // GHOST NODE (The HTML Label sits on top of this invisible node)
+            // GHOST NODE (The HTML overlay sits on top of this)
             {
                 selector: 'node',
                 style: {
-                    'width': 200, 
-                    'height': 80,
-                    'background-opacity': 0, // Invisible background
+                    'width': 220,
+                    'height': 60, // approximate height
+                    'background-opacity': 0, // Invisible
                     'border-width': 0
                 }
             },
-            // EDGES
+            // EDGES - Trying to mimic the horizontal "flow"
             {
                 selector: 'edge',
                 style: {
-                    'width': 2,
-                    'curve-style': 'bezier',
-                    'line-color': '#b0b0b0',
-                    'target-arrow-color': '#b0b0b0',
+                    'width': 1.5,
+                    'curve-style': 'bezier', // Or 'taxi' for right-angles
+                    'line-color': '#999',
+                    'target-arrow-color': '#999',
                     'target-arrow-shape': 'triangle',
-                    'font-size': '10px',
+                    'arrow-scale': 1,
+                    'source-distance-from-node': 2,
+                    'target-distance-from-node': 2,
+                    // Label styling
+                    'label': 'data(label)',
+                    'font-size': '9px',
                     'color': '#555',
-                    'text-background-color': '#fff',
+                    'text-background-color': '#f8f9fa',
                     'text-background-opacity': 1,
-                    'text-background-padding': 2
+                    'text-background-padding': 2,
+                    'text-rotation': 'autorotate'
                 }
             },
-            // RED ERROR LINES
+            // ERROR EDGES (Red)
             {
-                selector: 'edge[label="error"], edge[label="Error"], edge[label="timeout"], edge[isError="true"]',
+                selector: 'edge[isError="true"]',
                 style: {
-                    'line-color': '#dc3545',
-                    'target-arrow-color': '#dc3545',
+                    'line-color': '#d63939', // WxCC Red
+                    'target-arrow-color': '#d63939',
                     'width': 2
                 }
             }
         ],
-        layout: { name: 'preset' }
+        layout: { name: 'preset' } // CRITICAL: Use 'preset' to respect X/Y from JSON
     });
 
-    // Configure HTML Label Extension
+    // 3. Configure HTML Labels (The visual cards)
     cy.nodeHtmlLabel([{
         query: 'node',
         valign: "center",
@@ -58,18 +67,25 @@ document.addEventListener('DOMContentLoaded', () => {
         valignBox: "center",
         halignBox: "center",
         tpl: function(data) {
-            return generateNodeHTML(data);
+            return generateWxCard(data);
         }
     }]);
 
-    // Handle Click for Details
+    // 4. Click Handler (Details Panel)
     cy.on('tap', 'node', function(evt){
         const nodeData = evt.target.data();
-        detailsContent.textContent = JSON.stringify(nodeData.raw, null, 4);
-        detailsPanel.show();
+        const rawJson = nodeData.raw || {};
+        
+        // Pretty print JSON
+        document.getElementById('detailsContent').textContent = JSON.stringify(rawJson, null, 2);
+        
+        // Open Bootstrap Offcanvas
+        const offcanvasEl = document.getElementById('detailsPanel');
+        const bsOffcanvas = new bootstrap.Offcanvas(offcanvasEl);
+        bsOffcanvas.show();
     });
 
-    // --- UI LOGIC ---
+    // 5. UI Logic (Upload, Fit, Print)
     const fileInput = document.getElementById('fileInput');
     const btnProcess = document.getElementById('btnProcess');
     const btnFit = document.getElementById('btnFit');
@@ -99,16 +115,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     cy.elements().remove();
                     cy.add(elements);
                     
-                    // Respect coordinates
-                    cy.layout({ name: 'preset', fit: true, padding: 50 }).run();
+                    // Run layout (preset uses the manual coordinates)
+                    cy.layout({ name: 'preset' }).run();
+                    
+                    // Fit after a brief delay to ensure rendering
+                    setTimeout(() => cy.fit(50), 100);
 
                     document.getElementById('flowInfo').classList.remove('d-none');
                     document.getElementById('flowName').innerText = json.name || selectedFile.name;
                     btnFit.disabled = false;
+                    document.getElementById('errorMsg').classList.add('d-none');
 
                 } catch (err) {
-                    alert("Error: " + err.message);
                     console.error(err);
+                    const el = document.getElementById('errorMsg');
+                    el.innerText = "Error: " + err.message;
+                    el.classList.remove('d-none');
                 } finally {
                     loadingOverlay.classList.add('d-none');
                 }
@@ -120,11 +142,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btnFit.addEventListener('click', () => cy.fit(50));
     
     document.getElementById('btnPdf').addEventListener('click', () => {
-        cy.fit(50);
+        cy.fit(20); 
         setTimeout(() => window.print(), 500);
     });
 
-    // --- PARSER ---
+    // ---------------------------------------------------------
+    // CORE PARSER - The Logic Engine
+    // ---------------------------------------------------------
     function parseWxCCFlow(json) {
         let nodes = [];
         let edges = [];
@@ -133,42 +157,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const activities = json.process.activities; 
         const links = json.process.links;
+        // WxCC stores coordinates in 'diagram.widgets', keyed by activity ID
         const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
 
         // Parse Nodes
         Object.values(activities).forEach(act => {
-            const typeInfo = getNodeTypeInfo(act);
-            const posX = widgets[act.id]?.point?.x || 0;
-            const posY = widgets[act.id]?.point?.y || 0;
-
-            // Extract rows for the card body
-            let rows = [];
-            if(act.activityName === 'play-message' && act.properties?.prompts) {
-                rows.push({ label: "Prompt", val: act.properties.prompts[0]?.value || "Variable" });
-            } 
-            else if(act.activityName === 'set-variable' && act.properties?.updates) {
-                Object.keys(act.properties.updates).forEach(k => {
-                    rows.push({ label: "Set", val: k });
-                });
+            const style = getWxNodeStyle(act);
+            
+            // Coordinates
+            let posX = 0, posY = 0;
+            if (widgets[act.id] && widgets[act.id].point) {
+                posX = widgets[act.id].point.x;
+                posY = widgets[act.id].point.y;
             }
-            else if(act.activityName === 'ivr-menu' && act.properties?.links) {
-                rows.push({ label: "Opts", val: Object.keys(act.properties.links).length + " Links" });
-            }
-            else if(act.activityName === 'case-statement' && act.properties?.cases) {
-                 rows.push({ label: "Cases", val: Object.keys(act.properties.cases).length });
-            }
-
-            // Always add ID or subtype if rows empty
-            if(rows.length === 0) rows.push({ label: "Type", val: act.activityName });
 
             nodes.push({
                 data: { 
                     id: act.id, 
-                    name: act.name || "Unknown",
-                    icon: typeInfo.icon,
-                    colorClass: typeInfo.bgClass,
-                    rows: rows,
-                    raw: act // Store full JSON for details panel
+                    title: act.name || "Unknown",
+                    subtitle: style.subtitle,
+                    icon: style.icon,
+                    colorClass: style.bgClass,
+                    rows: style.dataRows, // Specific details like vars or cases
+                    raw: act
                 },
                 position: { x: posX, y: posY }
             });
@@ -177,15 +188,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Parse Edges
         links.forEach(link => {
             let label = link.conditionExpr || "";
-            // Simplify labels
+            // Clean up common labels
             if(label === 'true') label = '';
             if(label === 'false') label = 'Else';
             
-            // Detect error lines
-            let isError = false;
-            if(label.toLowerCase().includes('error') || label.toLowerCase().includes('timeout') || link.type === 'error') {
-                isError = true;
-            }
+            // Error Detection
+            const lowerLabel = label.toLowerCase();
+            const isError = lowerLabel.includes('error') || lowerLabel.includes('timeout') || link.type === 'error';
 
             if (link.sourceActivityId && link.targetActivityId) {
                 edges.push({
@@ -202,38 +211,101 @@ document.addEventListener('DOMContentLoaded', () => {
         return [...nodes, ...edges];
     }
 
-    // --- HELPERS ---
-    function getNodeTypeInfo(act) {
+    // ---------------------------------------------------------
+    // STYLE HELPER - Maps WxCC Types to Visuals
+    // ---------------------------------------------------------
+    function getWxNodeStyle(act) {
         const type = act.activityName;
-        if(type === 'start' || type === 'event') return { icon: 'fa-play', bgClass: 'bg-start' };
-        if(type === 'disconnect-contact') return { icon: 'fa-phone-slash', bgClass: 'bg-end' };
-        if(type === 'ivr-menu') return { icon: 'fa-list-ol', bgClass: 'bg-menu' };
-        if(type === 'play-message') return { icon: 'fa-volume-high', bgClass: 'bg-play' };
-        if(type === 'set-variable') return { icon: 'fa-pencil', bgClass: 'bg-set' };
-        if(type === 'case-statement') return { icon: 'fa-code-branch', bgClass: 'bg-condition' };
-        if(type === 'queue-contact') return { icon: 'fa-users', bgClass: 'bg-action' };
-        return { icon: 'fa-gear', bgClass: 'bg-default' };
+        const props = act.properties || {};
+        
+        let s = { 
+            icon: 'fa-gear', 
+            bgClass: 'bg-gray', 
+            subtitle: type, 
+            dataRows: [] 
+        };
+
+        // 1. START / EVENT
+        if(type === 'start' || type === 'event' || type === 'NewPhoneContact') {
+            s.icon = 'fa-play';
+            s.bgClass = 'bg-green';
+            s.subtitle = 'Start Flow';
+            if(props.event) s.dataRows.push({k:'Event', v:props.event});
+        }
+        // 2. PARSE / SET VAR (Purple)
+        else if(type === 'set-variable' || type === 'parse-activity') {
+            s.icon = 'fa-code';
+            s.bgClass = 'bg-purple';
+            if(props.updates) {
+                // Show first 2 variables
+                const keys = Object.keys(props.updates);
+                if(keys[0]) s.dataRows.push({k:'Set', v:keys[0]});
+                if(keys[1]) s.dataRows.push({k:'Set', v:keys[1]});
+            }
+        }
+        // 3. CASE / SWITCH (Orange)
+        else if(type === 'case-statement' || type === 'enum-gateway') {
+            s.icon = 'fa-share-nodes';
+            s.bgClass = 'bg-orange';
+            s.subtitle = 'Decision';
+            // List cases
+            if(props.cases) {
+                const caseKeys = Object.keys(props.cases).slice(0,3); // Max 3
+                s.dataRows.push({k:'Cases', v: caseKeys.join(', ')});
+            }
+            if(props.menuLinks) {
+                 const linkKeys = Object.keys(props.menuLinks).slice(0,3);
+                 s.dataRows.push({k:'Opts', v: linkKeys.join(', ')});
+            }
+        }
+        // 4. PLAY / QUEUE (Blue)
+        else if(type === 'play-message' || type === 'queue-contact') {
+            s.icon = 'fa-volume-high';
+            s.bgClass = 'bg-blue';
+            if(type === 'queue-contact') s.icon = 'fa-users';
+            
+            // Show prompt name if available
+            if(props.prompts && props.prompts[0]) {
+                let prompt = props.prompts[0].value || "Audio";
+                if(prompt.length > 20) prompt = prompt.substring(0,18) + "..";
+                s.dataRows.push({k:'Msg', v: prompt});
+            }
+        }
+        // 5. END (Red)
+        else if(type === 'disconnect-contact') {
+            s.icon = 'fa-phone-slash';
+            s.bgClass = 'bg-gray'; // WxCC often uses gray for end, or red.
+        }
+
+        return s;
     }
 
-    // Generate the HTML for the Node Card
-    function generateNodeHTML(data) {
-        let rowsHtml = data.rows.map(r => `
-            <div class="wx-row">
-                <span class="wx-label">${r.label}</span>
-                <span class="wx-val" title="${r.val}">${r.val}</span>
-            </div>
-        `).join('');
+    // ---------------------------------------------------------
+    // HTML GENERATOR - Creates the DOM elements for nodes
+    // ---------------------------------------------------------
+    function generateWxCard(data) {
+        // Build Data Rows HTML
+        const rowsHtml = data.rows.map(r => 
+            `<div class="wx-data-row"><span class="wx-key">${r.k}:</span><span class="wx-val">${r.v}</span></div>`
+        ).join('');
 
         return `
-            <div class="wx-node">
-                <div class="wx-header ${data.colorClass}">
+            <div class="wx-card">
+                <div class="wx-icon-col ${data.colorClass}">
                     <i class="fa-solid ${data.icon}"></i>
-                    <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${data.name}</span>
                 </div>
-                <div class="wx-body">
-                    ${rowsHtml}
+                <div class="wx-content-col">
+                    <div class="wx-title" title="${data.title}">${data.title}</div>
+                    <div class="wx-subtitle">${data.subtitle}</div>
+                    <div class="wx-body">
+                        ${rowsHtml}
+                    </div>
                 </div>
             </div>
         `;
+    }
+
+    function displayVersions() {
+        // Optional debug tag
     }
 });
