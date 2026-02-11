@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
             {
                 selector: 'node',
                 style: {
-                    'background-color': '#0d6efd', // Blue
+                    'background-color': '#0d6efd',
                     'label': 'data(label)',
                     'color': '#fff',
                     'text-valign': 'center',
@@ -19,12 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             {
-                selector: 'node[type="start"]', // Specific style for Start node
-                style: { 'background-color': '#198754', 'shape': 'ellipse' } // Green
+                selector: 'node[type="start"]',
+                style: { 'background-color': '#198754', 'shape': 'ellipse' }
             },
             {
-                selector: 'node[type="disconnect-contact"]', // Specific style for End/Disconnect
-                style: { 'background-color': '#dc3545' } // Red
+                selector: 'node[type="disconnect-contact"]',
+                style: { 'background-color': '#dc3545' }
             },
             {
                 selector: 'edge',
@@ -43,58 +43,80 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         ],
-        layout: { 
-            name: 'dagre', 
-            rankDir: 'LR', 
-            spacingFactor: 1.1 
-        }
+        layout: { name: 'preset' } // Start with no layout to save resources
     });
 
     const fileInput = document.getElementById('fileInput');
+    const btnProcess = document.getElementById('btnProcess');
     const flowInfo = document.getElementById('flowInfo');
     const flowNameDisplay = document.getElementById('flowName');
     const errorMsg = document.getElementById('errorMsg');
+    const loadingOverlay = document.getElementById('loadingOverlay');
 
+    let selectedFile = null;
+
+    // 1. Handle File Selection (Just enables the button)
     fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
+        if (event.target.files.length > 0) {
+            selectedFile = event.target.files[0];
+            btnProcess.disabled = false;
+            errorMsg.classList.add('d-none');
+        } else {
+            btnProcess.disabled = true;
+        }
+    });
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const json = JSON.parse(e.target.result);
-                console.log("JSON Loaded:", json); // Debug info
-                
-                errorMsg.classList.add('d-none');
-                
-                // --- PARSING LOGIC SPECIFIC TO YOUR FILE ---
-                const elements = parseFlowBuilderJson(json);
-                
-                if (elements.length === 0) {
-                    throw new Error("Parsed 0 nodes. Check Console for structure details.");
+    // 2. Handle "Visualize" Click (Does the heavy lifting)
+    btnProcess.addEventListener('click', () => {
+        if (!selectedFile) return;
+
+        // Show loading spinner
+        loadingOverlay.classList.remove('d-none');
+
+        // Use setTimeout to allow the UI to render the spinner before blocking with JS
+        setTimeout(() => {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    
+                    const elements = parseFlowBuilderJson(json);
+                    
+                    if (elements.length === 0) {
+                        throw new Error("Parsed 0 nodes. Check JSON structure.");
+                    }
+
+                    // Reset and Load
+                    cy.elements().remove();
+                    cy.add(elements);
+
+                    // Run Layout
+                    cy.layout({ 
+                        name: 'dagre', 
+                        rankDir: 'LR', 
+                        nodeSep: 50, 
+                        rankSep: 100,
+                        animate: false // Disable animation for speed
+                    }).run();
+
+                    // Update UI
+                    flowInfo.classList.remove('d-none');
+                    flowNameDisplay.innerText = json.name || selectedFile.name;
+                    errorMsg.classList.add('d-none');
+
+                } catch (err) {
+                    console.error(err);
+                    errorMsg.innerText = "Error: " + err.message;
+                    errorMsg.classList.remove('d-none');
+                } finally {
+                    // Hide spinner regardless of success/fail
+                    loadingOverlay.classList.add('d-none');
                 }
+            };
 
-                // Load into Cytoscape
-                cy.elements().remove();
-                cy.add(elements);
-                cy.layout({ 
-                    name: 'dagre', 
-                    rankDir: 'LR', 
-                    nodeSep: 50, 
-                    rankSep: 100 
-                }).run();
-
-                // UI Updates
-                flowInfo.classList.remove('d-none');
-                flowNameDisplay.innerText = json.name || file.name;
-
-            } catch (err) {
-                console.error(err);
-                errorMsg.innerText = "Error: " + err.message;
-                errorMsg.classList.remove('d-none');
-            }
-        };
-        reader.readAsText(file);
+            reader.readAsText(selectedFile);
+        }, 100); // 100ms delay to ensure spinner appears
     });
 
     // PDF / Print Handler
@@ -102,46 +124,40 @@ document.addEventListener('DOMContentLoaded', () => {
         window.print();
     });
 
-    // --- PARSER FOR YOUR SPECIFIC JSON FORMAT ---
+    // --- PARSER ---
     function parseFlowBuilderJson(json) {
         let nodes = [];
         let edges = [];
 
-        // 1. Locate the process object
-        // Your file has json.process.activities (Object) and json.process.links (Array)
         if (!json.process || !json.process.activities || !json.process.links) {
-            console.warn("Standard structure not found. Checking alternate locations...");
+            // Fallback for older formats if needed, or return empty
             return []; 
         }
 
-        const activities = json.process.activities; // Object key=ID, val=Data
-        const links = json.process.links;           // Array
+        const activities = json.process.activities; 
+        const links = json.process.links;           
 
-        // 2. Parse Nodes (Activities)
-        // Convert Object keys to Array
+        // Parse Nodes
         Object.values(activities).forEach(act => {
             let nodeLabel = act.name || "Unknown";
             let nodeType = act.activityName || "action";
 
-            // Clean up labels for specific types
             if (nodeType === 'play-message') nodeLabel = "Play: " + act.name;
-            if (nodeType === 'menu') nodeLabel = "Menu: " + act.name;
+            if (nodeType === 'ivr-menu') nodeLabel = "Menu: " + act.name;
+            if (nodeType === 'set-variable') nodeLabel = "Set: " + act.name;
 
             nodes.push({
                 data: { 
                     id: act.id, 
                     label: nodeLabel,
-                    type: nodeType // Used for styling colors
+                    type: nodeType 
                 }
             });
         });
 
-        // 3. Parse Edges (Links)
+        // Parse Edges
         links.forEach(link => {
-            // Your JSON uses 'conditionExpr' for the line label (e.g. "1", "timeout")
             let edgeLabel = link.conditionExpr || "";
-            
-            // Sometimes it is 'properties.value'
             if (!edgeLabel && link.properties && link.properties.value) {
                 edgeLabel = link.properties.value;
             }
@@ -157,7 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        console.log(`Parsed ${nodes.length} nodes and ${edges.length} edges.`);
         return [...nodes, ...edges];
     }
 });
