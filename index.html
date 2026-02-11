@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WxCC Flow Visualizer v8.0</title>
+    <title>WxCC Flow Visualizer v9.0</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -11,75 +11,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
     <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-    
-    <script src="https://cdn.jsdelivr.net/npm/cytoscape-node-html-label@1.2.2/dist/cytoscape-node-html-label.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
-        body, html { height: 100%; width: 100%; overflow: hidden; background-color: #f4f4f4; margin: 0; padding: 0; }
-        
-        #cy { width: 100%; height: 100%; display: block; z-index: 1; }
+        body, html { height: 100%; width: 100%; overflow: hidden; background-color: #f4f4f4; margin: 0; }
+        #cy { width: 100%; height: 100%; display: block; }
 
+        /* Floating Controls */
         .controls-layer {
             position: absolute; top: 20px; left: 20px; width: 280px; z-index: 100;
-            background: rgba(255, 255, 255, 0.98); border: 1px solid #ddd;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 8px; padding: 15px;
+            background: rgba(255, 255, 255, 0.95); border: 1px solid #ccc;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 6px; padding: 15px;
         }
 
+        /* Loading Spinner */
         #loadingOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255,255,255,0.9); z-index: 2000;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
-
-        /* --- WEBEX CARD STYLES --- */
-        /* These are used by the HTML Label Extension */
-        .wx-card {
-            width: 220px; 
-            min-height: 50px; 
-            background-color: #ffffff; 
-            border-radius: 4px; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.15); 
-            display: flex; 
-            overflow: hidden; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            border: 1px solid #dcdcdc;
-            text-align: left;
-            pointer-events: none; /* Let clicks pass through to Cytoscape node */
-        }
-
-        .wx-icon-col {
-            width: 32px; 
-            display: flex; align-items: center; justify-content: center; 
-            color: white; font-size: 14px;
-        }
-
-        .wx-content-col {
-            flex-grow: 1; padding: 6px 10px; 
-            display: flex; flex-direction: column; justify-content: center; 
-            overflow: hidden;
-        }
-
-        .wx-title {
-            font-weight: 700; font-size: 11px; color: #222; margin-bottom: 2px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-
-        .wx-subtitle {
-            font-size: 9px; color: #888; margin-bottom: 3px; font-style: italic;
-        }
-
-        .wx-row {
-            display: flex; justify-content: space-between; 
-            border-top: 1px solid #f0f0f0; padding-top: 3px; margin-top: 3px;
-        }
-        .wx-k { color: #666; margin-right: 6px; font-size: 10px; }
-        .wx-v { font-family: monospace; color: #222; font-weight: 600; font-size: 10px; 
-                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
-
-        @media print {
-            .controls-layer, .offcanvas, #loadingOverlay { display: none !important; }
-            #cy { height: 100vh; width: 100vw; }
         }
     </style>
 </head>
@@ -87,22 +36,21 @@
 
     <div id="loadingOverlay" class="d-none">
         <div class="spinner-border text-primary" role="status"></div>
-        <div class="mt-2 small text-muted font-monospace">Processing v8.0...</div>
+        <div class="mt-2 small fw-bold text-secondary">Generating Nodes...</div>
     </div>
 
     <div class="controls-layer">
-        <h6 class="fw-bold mb-3"><i class="fa-solid fa-diagram-project me-2"></i>Flow Visualizer v8</h6>
-        <div class="mb-3">
-            <input type="file" id="fileInput" class="form-control form-control-sm" accept=".json">
-        </div>
-        <div class="d-flex gap-2 mb-3">
+        <h6 class="fw-bold mb-3"><i class="fa-solid fa-code-branch me-2"></i>Visualizer v9.0</h6>
+        <input type="file" id="fileInput" class="form-control form-control-sm mb-3" accept=".json">
+        
+        <div class="d-flex gap-2 mb-2">
             <button id="btnProcess" class="btn btn-primary btn-sm flex-grow-1" disabled>Visualize</button>
-            <button id="btnFit" class="btn btn-outline-secondary btn-sm" disabled><i class="fa-solid fa-compress"></i> Fit</button>
+            <button id="btnFit" class="btn btn-outline-secondary btn-sm" disabled>Fit</button>
         </div>
-        <div id="flowInfo" class="d-none border-top pt-2">
-            <div class="text-uppercase text-muted fw-bold" style="font-size: 10px;">Active Flow</div>
-            <div id="flowName" class="text-truncate fw-bold small mb-2 text-dark"></div>
-            <button id="btnPdf" class="btn btn-danger w-100 btn-sm"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+        
+        <div id="flowInfo" class="d-none border-top pt-2 mt-2">
+            <div id="flowName" class="text-truncate fw-bold small mb-2"></div>
+            <button id="btnPdf" class="btn btn-danger w-100 btn-sm">Export PDF</button>
         </div>
         <div id="errorMsg" class="alert alert-danger mt-2 d-none py-1 px-2 small"></div>
     </div>
@@ -114,7 +62,7 @@
             <h6 class="offcanvas-title m-0"><i class="fa-solid fa-circle-info me-2"></i>Node Config</h6>
             <button type="button" class="btn-close btn-sm" data-bs-dismiss="offcanvas"></button>
         </div>
-        <div class="offcanvas-body p-0 bg-light">
+        <div class="offcanvas-body bg-light p-0">
             <div class="p-3">
                 <pre id="detailsContent" class="bg-white border rounded p-3 small mb-0 shadow-sm" style="font-size: 11px; white-space: pre-wrap;"></pre>
             </div>
@@ -124,99 +72,174 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         
-        // 1. EXTENSION REGISTRATION
-        try {
-            if (typeof cytoscapeDagre !== 'undefined') {
-                cytoscape.use(cytoscapeDagre);
-            }
-        } catch (e) { console.warn(e); }
+        // 1. Register Layout
+        try { if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre); } catch(e){}
 
-        // 2. CYTOSCAPE INIT
+        // 2. Init Cytoscape
         let cy = cytoscape({
             container: document.getElementById('cy'),
             boxSelectionEnabled: false,
-            autounselectify: true,
             style: [
                 {
                     selector: 'node',
                     style: {
-                        'width': 220, 
-                        'height': 60,
-                        'background-opacity': 0, // Make the backing node invisible
+                        'shape': 'rectangle',
+                        'width': 240,
+                        'height': 80,
+                        'background-color': 'transparent', // We draw our own background via SVG
+                        'background-image': 'data(svg)',   // The Magic: SVG rendered as image
+                        'background-fit': 'contain',
                         'border-width': 0
                     }
                 },
                 {
                     selector: 'edge',
                     style: {
-                        'width': 1.5,
+                        'width': 2,
                         'curve-style': 'bezier',
-                        'line-color': '#adb5bd',
-                        'target-arrow-color': '#adb5bd',
+                        'line-color': '#a0a0a0',
+                        'target-arrow-color': '#a0a0a0',
                         'target-arrow-shape': 'triangle',
-                        'arrow-scale': 1.2,
-                        'font-size': '9px',
-                        'color': '#6c757d',
-                        'text-background-color': '#f4f4f4',
-                        'text-background-opacity': 1,
-                        'text-background-padding': 2,
-                        'text-rotation': 'autorotate',
-                        'label': 'data(label)'
+                        'font-size': '10px',
+                        'color': '#444',
+                        'text-background-color': '#fff',
+                        'text-background-opacity': 0.8,
+                        'label': 'data(label)',
+                        'text-rotation': 'autorotate'
                     }
                 },
+                // Red Error Lines
                 {
                     selector: 'edge[isError="true"]',
-                    style: {
-                        'line-color': '#dc3545',
-                        'target-arrow-color': '#dc3545',
-                        'color': '#dc3545'
-                    }
+                    style: { 'line-color': '#dc3545', 'target-arrow-color': '#dc3545', 'color': '#dc3545' }
                 }
             ],
             layout: { name: 'preset' }
         });
 
-        // 3. HTML LABEL CONFIGURATION (THE VISUAL PART)
-        if (cy.nodeHtmlLabel) {
-            cy.nodeHtmlLabel([{
-                query: 'node',
-                valign: "center",
-                halign: "center",
-                valignBox: "center",
-                halignBox: "center",
-                tpl: function(data) {
-                    return generateCardHTML(data);
-                }
-            }]);
-        } else {
-            alert("Visualization Engine Failed to Load. Please Refresh.");
-        }
+        // 3. UI Logic
+        const fileInput = document.getElementById('fileInput');
+        const btnProcess = document.getElementById('btnProcess');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        let selectedFile = null;
 
-        // 4. GENERATE HTML STRING
-        function generateCardHTML(data) {
-            // Build Rows
-            const rowsHtml = data.rows.map(r => `
-                <div class="wx-row">
-                    <span class="wx-k">${r.k}:</span>
-                    <span class="wx-v" title="${r.v}">${r.v}</span>
-                </div>
-            `).join('');
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                btnProcess.disabled = false;
+            }
+        });
 
-            return `
-                <div class="wx-card">
-                    <div class="wx-icon-col" style="background-color: ${data.barColor}">
-                        <i class="fa-solid ${data.icon}"></i>
-                    </div>
-                    <div class="wx-content-col">
-                        <div class="wx-title" title="${data.title}">${data.title}</div>
-                        <div class="wx-subtitle">${data.subtitle}</div>
-                        <div>${rowsHtml}</div>
-                    </div>
-                </div>
+        btnProcess.addEventListener('click', () => {
+            if (!selectedFile) return;
+            loadingOverlay.classList.remove('d-none');
+
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        const elements = parseWxCCFlow(json);
+                        
+                        cy.elements().remove();
+                        cy.add(elements);
+                        
+                        cy.layout({ name: 'preset' }).run();
+                        setTimeout(() => cy.fit(50), 200);
+
+                        document.getElementById('flowInfo').classList.remove('d-none');
+                        document.getElementById('flowName').innerText = json.name || selectedFile.name;
+                        document.getElementById('btnFit').disabled = false;
+                        document.getElementById('errorMsg').classList.add('d-none');
+
+                    } catch (err) {
+                        console.error(err);
+                        const el = document.getElementById('errorMsg');
+                        el.innerText = "Error: " + err.message;
+                        el.classList.remove('d-none');
+                    } finally {
+                        loadingOverlay.classList.add('d-none');
+                    }
+                };
+                reader.readAsText(selectedFile);
+            }, 100);
+        });
+
+        document.getElementById('btnFit').addEventListener('click', () => cy.fit(50));
+        document.getElementById('btnPdf').addEventListener('click', () => { cy.fit(20); setTimeout(() => window.print(), 500); });
+
+        cy.on('tap', 'node', (evt) => {
+            const nodeData = evt.target.data();
+            document.getElementById('detailsContent').textContent = JSON.stringify(nodeData.raw, null, 2);
+            new bootstrap.Offcanvas(document.getElementById('detailsPanel')).show();
+        });
+
+        // --- 4. THE SVG GENERATOR (The "Split Card" Engine) ---
+        function createNodeSVG(data) {
+            const width = 240;
+            const height = 80;
+            const barWidth = 36;
+            
+            // Map colorClass to Hex
+            const colors = {
+                'bg-green': '#2fb755', // Start
+                'bg-purple': '#9f67cc', // Parse
+                'bg-orange': '#ff9d00', // Switch
+                'bg-blue':   '#00a0d1', // Queue
+                'bg-gray':   '#6c757d', // End
+                'bg-red':    '#d63939'  // Error
+            };
+            const barColor = colors[data.colorClass] || '#666';
+
+            // Escape text for SVG
+            const safeTitle = (data.title || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const safeSub = (data.subtitle || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+            // Build Data Rows
+            let rowsSvg = "";
+            let yPos = 50;
+            if (data.rows && data.rows.length > 0) {
+                data.rows.slice(0, 2).forEach(row => { // Max 2 rows
+                    const k = (row.k + ":").replace(/&/g, "&amp;");
+                    const v = (row.v || "").replace(/&/g, "&amp;");
+                    rowsSvg += `
+                        <text x="${barWidth + 10}" y="${yPos}" font-family="Arial" font-size="10" fill="#666">${k}</text>
+                        <text x="${width - 10}" y="${yPos}" font-family="Consolas, monospace" font-size="10" fill="#222" text-anchor="end">${v}</text>
+                    `;
+                    yPos += 14;
+                });
+            }
+
+            // Construct SVG String
+            const svgString = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+                    <defs>
+                        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+                            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.15"/>
+                        </filter>
+                    </defs>
+                    
+                    <rect x="2" y="2" width="${width-4}" height="${height-4}" rx="4" ry="4" fill="white" stroke="#dcdcdc" stroke-width="1" filter="url(#shadow)" />
+                    
+                    <path d="M 2 2 L ${barWidth} 2 L ${barWidth} ${height-2} L 2 ${height-2} Q 2 ${height-2} 2 ${height-6} L 2 6 Q 2 2 6 2 Z" fill="${barColor}" />
+                    
+                    <circle cx="${barWidth/2 + 2}" cy="${height/2}" r="8" fill="white" fill-opacity="0.2" />
+                    
+                    <text x="${barWidth + 10}" y="20" font-family="Segoe UI, Arial, sans-serif" font-weight="bold" font-size="11" fill="#333">${safeTitle}</text>
+                    
+                    <text x="${barWidth + 10}" y="34" font-family="Segoe UI, Arial, sans-serif" font-style="italic" font-size="10" fill="#888">${safeSub}</text>
+                    
+                    <line x1="${barWidth}" y1="38" x2="${width}" y2="38" stroke="#f0f0f0" stroke-width="1" />
+                    
+                    ${rowsSvg}
+                </svg>
             `;
+
+            // Convert SVG to Data URI
+            return 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
         }
 
-        // 5. PARSE & MAP STYLES
+        // --- 5. PARSER ---
         function parseWxCCFlow(json) {
             let nodes = [];
             let edges = [];
@@ -227,27 +250,36 @@
             const links = json.process.links;
             const widgets = json.diagram && json.diagram.widgets ? json.diagram.widgets : {};
 
-            // Nodes
+            // Parse Nodes
             Object.values(activities).forEach(act => {
                 const style = getWxNodeStyle(act);
-                const posX = widgets[act.id]?.point?.x || 0;
-                const posY = widgets[act.id]?.point?.y || 0;
+                
+                // Truncate title for SVG
+                let displayTitle = act.name || "Unknown";
+                if(displayTitle.length > 25) displayTitle = displayTitle.substring(0, 23) + "..";
+
+                // Generate SVG Data URI
+                const svgData = createNodeSVG({
+                    title: displayTitle,
+                    subtitle: style.subtitle,
+                    colorClass: style.bgClass,
+                    rows: style.dataRows
+                });
+
+                let posX = widgets[act.id]?.point?.x || 0;
+                let posY = widgets[act.id]?.point?.y || 0;
 
                 nodes.push({
                     data: { 
                         id: act.id, 
-                        title: act.name || "Unknown",
-                        subtitle: style.subtitle,
-                        icon: style.icon,
-                        barColor: style.barColor,
-                        rows: style.dataRows,
+                        svg: svgData, // Provide SVG to Cytoscape
                         raw: act
                     },
                     position: { x: posX, y: posY }
                 });
             });
 
-            // Edges
+            // Parse Edges
             links.forEach(link => {
                 let label = link.conditionExpr || "";
                 if(label === 'true') label = '';
@@ -272,27 +304,27 @@
             return [...nodes, ...edges];
         }
 
+        // --- 6. STYLE LOGIC ---
         function getWxNodeStyle(act) {
             const type = act.activityName;
             const props = act.properties || {};
-            
-            let s = { icon: 'fa-gear', barColor: '#6c757d', subtitle: type, dataRows: [] };
+            let s = { bgClass: 'bg-gray', subtitle: type, dataRows: [] };
 
             switch (type) {
                 case 'start':
                 case 'event':
                 case 'NewPhoneContact':
-                    s.icon = 'fa-play'; s.barColor = '#2fb755'; s.subtitle = 'Start Flow';
+                    s.bgClass = 'bg-green'; s.subtitle = 'Start Flow';
                     if(props.event) s.dataRows.push({k:'Event', v:props.event});
                     break;
                 
                 case 'disconnect-contact':
-                    s.icon = 'fa-phone-slash'; s.barColor = '#d63939'; s.subtitle = 'Disconnect';
+                    s.bgClass = 'bg-gray'; s.subtitle = 'End Flow';
                     break;
 
                 case 'set-variable':
                 case 'parse-activity':
-                    s.icon = 'fa-code'; s.barColor = '#9f67cc'; s.subtitle = 'Calculation';
+                    s.bgClass = 'bg-purple'; s.subtitle = 'Calculation';
                     if(props.updates) {
                         const keys = Object.keys(props.updates);
                         if(keys[0]) s.dataRows.push({k:'Set', v:keys[0]});
@@ -303,97 +335,37 @@
                 case 'case-statement':
                 case 'enum-gateway':
                 case 'condition-activity':
-                    s.icon = 'fa-share-nodes'; s.barColor = '#ff9d00'; s.subtitle = 'Decision';
+                    s.bgClass = 'bg-orange'; s.subtitle = 'Decision';
                     if(props.cases) s.dataRows.push({k:'Cases', v: Object.keys(props.cases).length});
-                    if(props.menuLinks) s.dataRows.push({k:'Opts', v: Object.keys(props.menuLinks).length});
-                    if(props.expression) s.dataRows.push({k:'Expr', v: props.expression});
+                    if(props.menuLinks) s.dataRows.push({k:'Opts', v: Object.keys(props.menuLinks).length + " Links"});
+                    if(props.expression) {
+                        let expr = props.expression;
+                        if(expr.length > 15) expr = expr.substring(0,15) + "..";
+                        s.dataRows.push({k:'Expr', v: expr});
+                    }
                     break;
 
                 case 'play-message':
                 case 'queue-contact':
                 case 'feedback':
                 case 'Feedback-V2':
-                    s.icon = 'fa-volume-high'; s.barColor = '#00a0d1'; s.subtitle = 'Action';
-                    if(type.includes('feedback')) { s.icon = 'fa-comment-dots'; s.subtitle = 'Survey'; }
-                    if(type.includes('queue')) { s.icon = 'fa-users'; s.subtitle = 'Queue'; }
+                    s.bgClass = 'bg-blue'; s.subtitle = 'Action';
+                    if(type.includes('feedback')) s.subtitle = 'Survey';
+                    if(type.includes('queue')) s.subtitle = 'Queue';
                     
                     if(props.prompts && props.prompts[0]) {
                         let p = props.prompts[0].value || "Var";
-                        if(p.length > 20) p = p.substring(0,18) + "..";
+                        if(p.length > 18) p = p.substring(0,16) + "..";
                         s.dataRows.push({k:'Msg', v: p});
                     }
                     break;
                 
                 case 'run-script':
-                    s.icon = 'fa-scroll'; s.barColor = '#9f67cc'; s.subtitle = 'Script';
+                    s.bgClass = 'bg-purple'; s.subtitle = 'Script';
                     break;
             }
             return s;
         }
-
-        // 6. EVENT HANDLERS
-        const fileInput = document.getElementById('fileInput');
-        const btnProcess = document.getElementById('btnProcess');
-        const btnFit = document.getElementById('btnFit');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        let selectedFile = null;
-
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                selectedFile = e.target.files[0];
-                btnProcess.disabled = false;
-            }
-        });
-
-        btnProcess.addEventListener('click', () => {
-            if (!selectedFile) return;
-            loadingOverlay.classList.remove('d-none');
-
-            setTimeout(() => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const json = JSON.parse(e.target.result);
-                        const elements = parseWxCCFlow(json);
-                        
-                        if (elements.length === 0) throw new Error("No nodes found in JSON.");
-
-                        cy.elements().remove();
-                        cy.add(elements);
-                        
-                        cy.layout({ name: 'preset' }).run();
-                        setTimeout(() => cy.fit(50), 200);
-
-                        document.getElementById('flowInfo').classList.remove('d-none');
-                        document.getElementById('flowName').innerText = json.name || selectedFile.name;
-                        document.getElementById('errorMsg').classList.add('d-none');
-                        btnFit.disabled = false;
-
-                    } catch (err) {
-                        console.error(err);
-                        const el = document.getElementById('errorMsg');
-                        el.innerText = "Error: " + err.message;
-                        el.classList.remove('d-none');
-                    } finally {
-                        loadingOverlay.classList.add('d-none');
-                    }
-                };
-                reader.readAsText(selectedFile);
-            }, 100);
-        });
-
-        btnFit.addEventListener('click', () => cy.fit(50));
-        
-        document.getElementById('btnPdf').addEventListener('click', () => {
-            cy.fit(20); 
-            setTimeout(() => window.print(), 500);
-        });
-
-        cy.on('tap', 'node', (evt) => {
-            const nodeData = evt.target.data();
-            document.getElementById('detailsContent').textContent = JSON.stringify(nodeData.raw, null, 2);
-            new bootstrap.Offcanvas(document.getElementById('detailsPanel')).show();
-        });
     });
     </script>
 </body>
